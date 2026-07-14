@@ -241,7 +241,7 @@ onMounted(() => {
   min-height: 80vh;
   background:
     linear-gradient(135deg, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.4) 100%),
-    url("../assets/gare_image.jpg") center/cover no-repeat;
+    url("https://gcgbyipdhhwctfyappsm.supabase.co/storage/v1/object/public/image_diatsara/gare_image.jpg") center/cover no-repeat;
   display: flex;
   align-items: center;
   justify-content: center;

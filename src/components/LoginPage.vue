@@ -157,7 +157,7 @@ async function login() {
   color: #f8fbf8;
   background:
     linear-gradient(rgba(10, 30, 28, 0.58), rgba(10, 30, 28, 0.7)),
-    url("../assets/gare_image.jpg") center / cover;
+    url("https://gcgbyipdhhwctfyappsm.supabase.co/storage/v1/object/public/image_diatsara/gare_image.jpg") center / cover;
 }
 
 .brand-panel h1 {
