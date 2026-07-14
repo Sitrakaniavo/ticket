@@ -1,11 +1,11 @@
-<!-- TicketPreviewPanel.vue -->
+<!-- TicketPreviewPanel.vue - Version Mobile Optimisée -->
 <script setup>
 const props = defineProps({
   previewData: {
     type: Object,
     required: true,
     default: () => ({
-      ticketNumber: 'V.......', // Mis à jour pour s'aligner sur ton nouveau format
+      ticketNumber: 'V.......',
       travelerName: '-',
       cin: '--- --- --- ---',
       mineur: false,
@@ -16,6 +16,10 @@ const props = defineProps({
       ticketClass: '2ème classe',
       amount: '0',
     })
+  },
+  isMobile: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -23,7 +27,7 @@ defineEmits(['submit'])
 </script>
 
 <template>
-  <div class="preview-panel">
+  <div class="preview-panel" :class="{ 'mobile-preview': isMobile }">
     <div class="ticket-card">
       <div class="ticket-header">
         <span class="company">DIATSARA</span>
@@ -253,5 +257,100 @@ defineEmits(['submit'])
 
 .confirm-btn:active {
   background: #174643;
+}
+
+/* ===== VERSION MOBILE ===== */
+.mobile-preview .ticket-card {
+  padding: 10px;
+  border-radius: 8px;
+}
+
+.mobile-preview .ticket-header {
+  padding-bottom: 4px;
+  margin-bottom: 8px;
+}
+
+.mobile-preview .company {
+  font-size: 0.75rem;
+}
+
+.mobile-preview .ticket-id {
+  font-size: 0.65rem;
+}
+
+.mobile-preview .ticket-body {
+  gap: 6px;
+}
+
+.mobile-preview .value-highlight {
+  font-size: 0.9rem;
+}
+
+.mobile-preview .value {
+  font-size: 0.75rem;
+}
+
+.mobile-preview .route-info {
+  padding: 6px 8px;
+  margin: 4px 0;
+}
+
+.mobile-preview .arrow {
+  font-size: 0.85rem;
+}
+
+.mobile-preview .meta-info {
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.mobile-preview .final-price {
+  font-size: 1rem;
+}
+
+.mobile-preview .confirm-btn {
+  height: 38px;
+  font-size: 0.85rem;
+  padding: 0 10px;
+}
+
+.mobile-preview .ticket-footer {
+  padding-top: 8px;
+  gap: 8px;
+}
+
+.mobile-preview .label {
+  font-size: 0.6rem;
+}
+
+@media (max-width: 480px) {
+  .preview-panel {
+    padding: 0;
+  }
+  
+  .ticket-card {
+    padding: 10px;
+  }
+  
+  .ticket-footer {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .confirm-btn {
+    width: 100%;
+    height: 40px;
+  }
+  
+  .price-zone {
+    width: 100%;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .final-price {
+    font-size: 1rem;
+  }
 }
 </style>

@@ -1,232 +1,321 @@
 <script setup>
-import { ref, computed, reactive, watch, onMounted } from 'vue'
-import QrcodeVue from 'qrcode.vue'
-import { supabaseClient } from '../lib/supabaseClient'
+import { ref, computed, reactive, watch, onMounted } from "vue";
+import QrcodeVue from "qrcode.vue";
+import { supabaseClient, supabaseMadarail } from "../lib/supabaseClient";
 
 const props = defineProps({
   cartItems: { type: Array, required: true, default: () => [] },
-})
+  isMobile: { type: Boolean, default: false },
+});
 
-const emit = defineEmits(['remove-item', 'edit-item', 'refresh'])
+const emit = defineEmits(["remove-item", "edit-item", "refresh"]);
 
 // ===== ÉTATS =====
-const currentFilter = ref('all')
-const isModalOpen = ref(false)
-const isEditModalOpen = ref(false)
-const selectedTicket = ref(null)
-const isSaving = ref(false)
-const editError = ref('')
-const editSuccess = ref(false)
+const currentFilter = ref("all");
+const isModalOpen = ref(false);
+const isEditModalOpen = ref(false);
+const selectedTicket = ref(null);
+const isSaving = ref(false);
+const editError = ref("");
+const editSuccess = ref(false);
 
-// ===== DONNÉES DES GARES =====
-const allGares = ref([])
-const isLoadingGares = ref(false)
+// ===== DONNÉES DES GARES ET VOYAGES =====
+const allGares = ref([]);
+const allVoyages = ref([]);
+const isLoadingGares = ref(false);
 
 // ===== FORMULAIRE D'ÉDITION =====
 const editForm = reactive({
   id: null,
-  nom_voyageur: '',
-  cin: '',
+  nom_voyageur: "",
+  cin: "",
   mineur: false,
-  classe: '2eme',
-  depart: '',
-  arrivee: '',
+  classe: "2eme",
+  depart: "",
+  arrivee: "",
   montant: 0,
-  num_ticket: '',
-  id_voyage: null
-})
+  num_ticket: "",
+  id_voyage: null,
+  date_voyage: "", // Date récupérée depuis voyages
+});
 
-// ===== CHARGEMENT DES GARES =====
-async function loadGares() {
-  if (allGares.value.length > 0) return
-  
-  isLoadingGares.value = true
+// ===== FONCTIONS DE FORMATAGE =====
+const formatPrice = (v) => {
+  if (v === undefined || v === null) return "0";
+  return new Intl.NumberFormat("fr-MG").format(v);
+};
+
+const formatDate = (dateString) => {
+  if (!dateString) return "---";
   try {
-    const { data, error } = await supabaseClient
-      .from('gares')
-      .select('code, nom, pk')
-      .order('pk', { ascending: true })
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat("fr-FR", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    }).format(date);
+  } catch {
+    return dateString;
+  }
+};
 
-    if (error) throw error
-    allGares.value = data || []
+// ===== RÉCUPÉRATION DE LA DATE DEPUIS VOYAGES =====
+async function getVoyageDate(voyageId) {
+  if (!voyageId) return null;
+
+  try {
+    const { data, error } = await supabaseMadarail
+      .from("voyages")
+      .select("id, date_voyage")
+      .eq("id", voyageId)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data;
   } catch (error) {
-    console.error("Erreur chargement des gares:", error.message)
-  } finally {
-    isLoadingGares.value = false
+    console.error("Erreur récupération date voyage:", error.message);
+    return null;
   }
 }
 
-// ===== FILTRAGE DES GARES D'ARRIVÉE =====
-const garesDepart = computed(() => allGares.value)
+// ===== CHARGEMENT DES VOYAGES =====
+async function loadVoyages() {
+  try {
+    const { data, error } = await supabaseMadarail
+      .from("voyages")
+      .select("id, date_voyage, sens")
+
+    if (error) throw error;
+    allVoyages.value = data || [];
+  } catch (error) {
+    console.error("Erreur chargement voyages:", error.message);
+  }
+}
+
+// ===== ENRICHIR LES TICKETS AVEC LA DATE =====
+const enrichedTickets = computed(() => {
+  return props.cartItems.map((ticket) => {
+    // Chercher le voyage correspondant
+    const voyage = allVoyages.value.find((v) => v.id === ticket.id_voyage);
+
+    // Si on trouve le voyage, ajouter la date et l'heure
+    if (voyage) {
+      return {
+        ...ticket,
+        date_voyage: voyage.date_voyage,
+        heure_depart: voyage.heure_depart,
+      };
+    }
+
+    // Si on a déjà une date dans le ticket, l'utiliser
+    if (ticket.date_voyage) {
+      return ticket;
+    }
+
+    // Sinon, retourner le ticket sans date
+    return {
+      ...ticket,
+      date_voyage: null,
+      heure_depart: null,
+    };
+  });
+});
+
+// ===== CHARGEMENT DES GARES =====
+async function loadGares() {
+  if (allGares.value.length > 0) return;
+
+  isLoadingGares.value = true;
+  try {
+    const { data, error } = await supabaseClient
+      .from("gares")
+      .select("code, nom, pk")
+      .order("pk", { ascending: true });
+
+    if (error) throw error;
+    allGares.value = data || [];
+  } catch (error) {
+    console.error("Erreur chargement des gares:", error.message);
+  } finally {
+    isLoadingGares.value = false;
+  }
+}
+
+// ===== FILTRAGE DES GARES =====
+const garesDepart = computed(() => allGares.value);
 
 const garesArrivee = computed(() => {
   if (!editForm.depart || allGares.value.length === 0) {
-    return []
+    return [];
   }
-  
-  const indexDepart = allGares.value.findIndex(g => g.nom === editForm.depart)
-  if (indexDepart === -1) return []
-  
-  return allGares.value.slice(indexDepart + 1)
-})
+
+  const indexDepart = allGares.value.findIndex(
+    (g) => g.nom === editForm.depart,
+  );
+  if (indexDepart === -1) return [];
+
+  return allGares.value.slice(indexDepart + 1);
+});
 
 // ===== RECHERCHE DU PRIX =====
-const prixCalcule = ref(null)
-const isLoadingPrice = ref(false)
+const prixCalcule = ref(null);
+const isLoadingPrice = ref(false);
 
 async function rechercherPrix() {
   if (!editForm.depart || !editForm.arrivee) {
-    prixCalcule.value = null
-    return
+    prixCalcule.value = null;
+    return;
   }
 
-  const gareDepart = allGares.value.find(g => g.nom === editForm.depart)
-  const gareArrivee = allGares.value.find(g => g.nom === editForm.arrivee)
+  const gareDepart = allGares.value.find((g) => g.nom === editForm.depart);
+  const gareArrivee = allGares.value.find((g) => g.nom === editForm.arrivee);
 
   if (!gareDepart || !gareArrivee) {
-    prixCalcule.value = null
-    return
+    prixCalcule.value = null;
+    return;
   }
 
-  isLoadingPrice.value = true
+  isLoadingPrice.value = true;
   try {
     const { data, error } = await supabaseClient
-      .from('trajets_train')
-      .select('tarif_1, tarif_2')
-      .ilike('gare_depart', gareDepart.code.trim())
-      .ilike('gare_arrivee', gareArrivee.code.trim())
-      .maybeSingle()
+      .from("trajets_train")
+      .select("tarif_1, tarif_2")
+      .ilike("gare_depart", gareDepart.code.trim())
+      .ilike("gare_arrivee", gareArrivee.code.trim())
+      .maybeSingle();
 
-    if (error) throw error
+    if (error) throw error;
 
     if (data) {
-      const tarif = editForm.classe === '1ere' 
-        ? Number(data.tarif_2 || data.tarif_1 || 0)
-        : Number(data.tarif_1 || 0)
+      const tarif =
+        editForm.classe === "1ere"
+          ? Number(data.tarif_2 || data.tarif_1 || 0)
+          : Number(data.tarif_1 || 0);
 
-      // Application des paliers de prix
-      let montantFinal = tarif
-      if (tarif === 5800) montantFinal = 7000
-      else if (tarif === 8800) montantFinal = 10000
-      else if (tarif === 11600) montantFinal = 14000
-      else if (tarif === 13800) montantFinal = 15000
-      else if (tarif === 22600) montantFinal = 25000
+      let montantFinal = tarif;
+      if (tarif === 5800) montantFinal = 7000;
+      else if (tarif === 8800) montantFinal = 10000;
+      else if (tarif === 11600) montantFinal = 14000;
+      else if (tarif === 13800) montantFinal = 15000;
+      else if (tarif === 22600) montantFinal = 25000;
 
-      prixCalcule.value = montantFinal
-      editForm.montant = montantFinal
+      prixCalcule.value = montantFinal;
+      editForm.montant = montantFinal;
     } else {
-      prixCalcule.value = null
-      editForm.montant = 0
+      prixCalcule.value = null;
+      editForm.montant = 0;
     }
   } catch (error) {
-    console.error("Erreur recherche prix:", error.message)
-    prixCalcule.value = null
+    console.error("Erreur recherche prix:", error.message);
+    prixCalcule.value = null;
   } finally {
-    isLoadingPrice.value = false
+    isLoadingPrice.value = false;
   }
 }
 
 // ===== OUVERTURE MODALE D'ÉDITION =====
 async function openEditModal(item) {
-  // Charger les gares si nécessaire
-  await loadGares()
-  
-  // Charger les données du ticket
-  editForm.id = item.id
-  editForm.nom_voyageur = item.nom_voyageur || ''
-  editForm.cin = item.cin ? String(item.cin).replace(/(\d{3})(\d{3})(\d{3})(\d{3})/, "$1 $2 $3 $4") : ''
-  editForm.mineur = item.mineur || false
-  editForm.classe = item.classe || '2eme'
-  editForm.depart = item.depart || ''
-  editForm.arrivee = item.arrivee || ''
-  editForm.montant = item.montant || 0
-  editForm.num_ticket = item.num_ticket || ''
-  editForm.id_voyage = item.id_voyage || null
-  
-  editError.value = ''
-  editSuccess.value = false
-  prixCalcule.value = null
-  
-  // Rechercher le prix si les gares sont renseignées
+  await loadGares();
+
+  editForm.id = item.id;
+  editForm.nom_voyageur = item.nom_voyageur || "";
+  editForm.cin = item.cin
+    ? String(item.cin).replace(/(\d{3})(\d{3})(\d{3})(\d{3})/, "$1 $2 $3 $4")
+    : "";
+  editForm.mineur = item.mineur || false;
+  editForm.classe = item.classe || "2eme";
+  editForm.depart = item.depart || "";
+  editForm.arrivee = item.arrivee || "";
+  editForm.montant = item.montant || 0;
+  editForm.num_ticket = item.num_ticket || "";
+  editForm.id_voyage = item.id_voyage || null;
+  editForm.date_voyage = item.date_voyage || "";
+
+  editError.value = "";
+  editSuccess.value = false;
+  prixCalcule.value = null;
+
   if (editForm.depart && editForm.arrivee) {
-    await rechercherPrix()
+    await rechercherPrix();
   }
-  
-  isEditModalOpen.value = true
+
+  isEditModalOpen.value = true;
 }
 
-// ===== SURVEILLANCE DES CHANGEMENTS =====
-watch(() => [editForm.depart, editForm.arrivee, editForm.classe], async () => {
-  if (editForm.depart && editForm.arrivee) {
-    await rechercherPrix()
-  } else {
-    prixCalcule.value = null
-  }
-})
-
-// Formatage CIN - TOUJOURS MODIFIABLE
-watch(() => editForm.cin, (newValue) => {
-  if (!newValue) return
-  // Supprimer tous les caractères non numériques
-  let digits = newValue.replace(/\D/g, "")
-  // Limiter à 12 chiffres
-  if (digits.length > 12) {
-    digits = digits.slice(0, 12)
-  }
-  // Formater avec des espaces tous les 3 chiffres
-  const blocks = digits.match(/.{1,3}/g)
-  if (blocks) {
-    // Mettre à jour sans recréer de boucle
-    const formatted = blocks.join(" ")
-    if (formatted !== newValue) {
-      editForm.cin = formatted
+// ===== SURVEILLANCE =====
+watch(
+  () => [editForm.depart, editForm.arrivee, editForm.classe],
+  async () => {
+    if (editForm.depart && editForm.arrivee) {
+      await rechercherPrix();
+    } else {
+      prixCalcule.value = null;
     }
-  }
-})
+  },
+);
 
-// ===== SAUVEGARDE DE L'ÉDITION =====
+// Formatage CIN
+watch(
+  () => editForm.cin,
+  (newValue) => {
+    if (!newValue) return;
+    let digits = newValue.replace(/\D/g, "");
+    if (digits.length > 12) {
+      digits = digits.slice(0, 12);
+    }
+    const blocks = digits.match(/.{1,3}/g);
+    if (blocks) {
+      const formatted = blocks.join(" ");
+      if (formatted !== newValue) {
+        editForm.cin = formatted;
+      }
+    }
+  },
+);
+
+// ===== SAUVEGARDE =====
 async function saveEdit() {
-  // Validation des champs obligatoires
-  if (!editForm.nom_voyageur || editForm.nom_voyageur.trim() === '') {
-    editError.value = "Le nom du voyageur est obligatoire."
-    return
+  if (!editForm.nom_voyageur || editForm.nom_voyageur.trim() === "") {
+    editError.value = "Le nom du voyageur est obligatoire.";
+    return;
   }
 
   if (!editForm.depart) {
-    editError.value = "Veuillez sélectionner une gare de départ."
-    return
+    editError.value = "Veuillez sélectionner une gare de départ.";
+    return;
   }
 
   if (!editForm.arrivee) {
-    editError.value = "Veuillez sélectionner une gare d'arrivée."
-    return
+    editError.value = "Veuillez sélectionner une gare d'arrivée.";
+    return;
   }
 
-  if (!editForm.mineur && (!editForm.cin || editForm.cin.replace(/\s/g, "").length !== 12)) {
-    editError.value = "Le numéro CIN doit comporter exactement 12 chiffres."
-    return
+  if (
+    !editForm.mineur &&
+    (!editForm.cin || editForm.cin.replace(/\s/g, "").length !== 12)
+  ) {
+    editError.value = "Le numéro CIN doit comporter exactement 12 chiffres.";
+    return;
   }
 
-  // Si mineur, le CIN est optionnel mais on le garde tel quel
   if (editForm.mineur && editForm.cin) {
-    const cinDigits = editForm.cin.replace(/\s/g, "")
+    const cinDigits = editForm.cin.replace(/\s/g, "");
     if (cinDigits.length > 0 && cinDigits.length !== 12) {
-      editError.value = "Le numéro CIN doit comporter exactement 12 chiffres."
-      return
+      editError.value = "Le numéro CIN doit comporter exactement 12 chiffres.";
+      return;
     }
   }
 
   if (!prixCalcule.value && prixCalcule.value !== 0) {
-    editError.value = "Impossible de calculer le prix pour ce trajet. Vérifiez les gares sélectionnées."
-    return
+    editError.value = "Impossible de calculer le prix pour ce trajet.";
+    return;
   }
 
-  isSaving.value = true
-  editError.value = ''
-  editSuccess.value = false
+  isSaving.value = true;
+  editError.value = "";
+  editSuccess.value = false;
 
   try {
-    // Préparer les données de mise à jour
     const updateData = {
       nom_voyageur: editForm.nom_voyageur.trim(),
       mineur: editForm.mineur,
@@ -234,152 +323,196 @@ async function saveEdit() {
       depart: editForm.depart,
       arrivee: editForm.arrivee,
       montant: prixCalcule.value,
-      created_at: new Date().toISOString()
-    }
+      created_at: new Date().toISOString(),
+    };
 
-    // Traitement du CIN
-    if (editForm.cin && editForm.cin.trim() !== '') {
-      const cinDigits = editForm.cin.replace(/\s/g, "")
+    if (editForm.cin && editForm.cin.trim() !== "") {
+      const cinDigits = editForm.cin.replace(/\s/g, "");
       if (cinDigits.length > 0) {
-        updateData.cin = parseInt(cinDigits, 10)
+        updateData.cin = parseInt(cinDigits, 10);
       } else {
-        updateData.cin = 0
+        updateData.cin = 0;
       }
     } else {
-      updateData.cin = 0
+      updateData.cin = 0;
     }
 
-    // Mise à jour dans Supabase
     const { error } = await supabaseClient
       .from("ticket_voyageur_site")
       .update(updateData)
-      .eq("id", editForm.id)
+      .eq("id", editForm.id);
 
-    if (error) throw error
+    if (error) throw error;
 
-    // Succès
-    editSuccess.value = true
-    editError.value = ''
-    
-    // Fermer la modale après un court délai
+    editSuccess.value = true;
+    editError.value = "";
+
     setTimeout(() => {
-      isEditModalOpen.value = false
-      // Rafraîchir la liste des tickets
-      emit('refresh')
-      // Émettre l'événement d'édition
-      emit('edit-item', { ...editForm, ...updateData })
-      editSuccess.value = false
-    }, 1000)
-    
+      isEditModalOpen.value = false;
+      emit("refresh");
+      emit("edit-item", { ...editForm, ...updateData });
+      editSuccess.value = false;
+    }, 1000);
   } catch (error) {
-    console.error("Erreur lors de la mise à jour :", error.message)
-    editError.value = error.message || "Impossible de mettre à jour le billet."
+    console.error("Erreur lors de la mise à jour :", error.message);
+    editError.value = error.message || "Impossible de mettre à jour le billet.";
   } finally {
-    isSaving.value = false
+    isSaving.value = false;
   }
 }
 
 // ===== FERMETURE =====
 function closeEditModal() {
-  if (isSaving.value) return
-  isEditModalOpen.value = false
-  editError.value = ''
-  editSuccess.value = false
+  if (isSaving.value) return;
+  isEditModalOpen.value = false;
+  editError.value = "";
+  editSuccess.value = false;
 }
 
 // ===== AUTRES FONCTIONS =====
 function openModal(item) {
-  selectedTicket.value = item
-  isModalOpen.value = true
+  selectedTicket.value = item;
+  isModalOpen.value = true;
 }
 
 function refreshData() {
-  emit('refresh')
+  loadVoyages(); // Recharger les voyages pour mettre à jour les dates
+  emit("refresh");
 }
 
+function handleRemove(ticketId) {
+  if (props.isMobile) {
+    if (confirm("Supprimer ce billet ?")) {
+      emit("remove-item", ticketId);
+    }
+  } else {
+    emit("remove-item", ticketId);
+  }
+}
+
+// ===== FILTRES ET TOTAUX =====
 const filteredItems = computed(() => {
-  if (currentFilter.value === 'all') return props.cartItems
-  return props.cartItems.filter(item => item.status === currentFilter.value)
-})
+  const tickets = enrichedTickets.value;
+  if (currentFilter.value === "all") return tickets;
+  return tickets.filter((item) => item.status === currentFilter.value);
+});
 
-const totalActiveAmount = computed(() => 
-  props.cartItems.filter(i => i.status === 'actif')
-    .reduce((sum, i) => sum + Number(i.montant || 0), 0)
-)
+const totalActiveAmount = computed(() =>
+  enrichedTickets.value
+    .filter((i) => i.status === "actif")
+    .reduce((sum, i) => sum + Number(i.montant || 0), 0),
+);
 
-const formatPrice = (v) => new Intl.NumberFormat('fr-MG').format(v)
+// ===== CLASSE DISPLAY =====
+const getClasseDisplay = (classe) => {
+  if (classe === "1ere") return "1ère Classe";
+  if (classe === "2eme") return "2ème Classe";
+  return classe || "2ème Classe";
+};
 
 // ===== INITIALISATION =====
 onMounted(() => {
-  loadGares()
-})
+  loadGares();
+  loadVoyages();
+});
 </script>
 
 <template>
-  <div class="cart-panel-container">
+  <div class="cart-panel-container" :class="{ 'mobile-cart': isMobile }">
     <div class="cart-header-actions">
       <div class="filter-bar">
-        <span class="filter-label">Filtrer par statut :</span>
+        <span class="filter-label">Filtrer :</span>
         <div class="filter-options">
-          <button 
-            v-for="f in ['all', 'actif', 'inactif']" 
+          <button
+            v-for="f in ['all', 'actif', 'inactif']"
             :key="f"
-            class="filter-chip" 
+            class="filter-chip"
             :class="{ active: currentFilter === f }"
             @click="currentFilter = f"
           >
-            {{ f.charAt(0).toUpperCase() + f.slice(1) }} 
-            ({{ f === 'all' ? cartItems.length : cartItems.filter(i => i.status === f).length }})
+            {{ f.charAt(0).toUpperCase() + f.slice(1) }}
+            ({{
+              f === "all"
+                ? enrichedTickets.length
+                : enrichedTickets.filter((i) => i.status === f).length
+            }})
           </button>
         </div>
       </div>
-      
+
       <button class="btn-refresh-cart" @click="refreshData" title="Rafraîchir">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M23 4v6h-6" />
-          <path d="M1 20v-6h6" />
-          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10" />
-          <path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14" />
-        </svg>
-        Rafraîchir
+        <span v-if="!isMobile">🔄 Rafraîchir</span>
+        <span v-else>🔄</span>
       </button>
     </div>
 
-    <div style="display: flex; align-items: flex-start; gap: 12px; background: #f8fafc; border-left: 4px solid #0f172a; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 20px;">
-      <div style="font-size: 0.88rem; color: #334155; line-height: 1.5;">
-        <strong style="color: #0f172a; font-weight: 700;">NB :</strong> 
-        Pour valider les billets, veuillez aller auprès du vendeur près de vous.
-      </div>
+    <!-- Notice -->
+    <div class="notice-bar" :class="{ 'mobile-notice': isMobile }">
+      <span>💡</span>
+      <span>Pour valider les billets, présentez-vous au vendeur.</span>
     </div>
 
     <!-- GRILLE -->
-    <div class="cart-grid-layout">
-      <div v-for="item in filteredItems" :key="item.id" 
-        class="ticket-card" :class="`status-${item.status}`"
-        @click="openModal(item)">
-        
+    <div class="cart-grid-layout" :class="{ 'mobile-grid': isMobile }">
+      <div
+        v-for="item in filteredItems"
+        :key="item.id"
+        class="ticket-card"
+        :class="[`status-${item.status}`, { 'mobile-ticket': isMobile }]"
+        @click="openModal(item)"
+      >
         <div class="ticket-header">
           <span class="ticket-id">{{ item.num_ticket }}</span>
-          <span class="ticket-status-badge" :class="item.status">{{ item.status }}</span>
+          <span class="ticket-status-badge" :class="item.status">{{
+            item.status
+          }}</span>
         </div>
 
         <div class="ticket-body">
-          <div class="route-display">
-            <div class="station"><span>Départ</span><strong>{{ item.depart }}</strong></div>
-            <div class="route-arrow">→</div>
-            <div class="station"><span>Arrivée</span><strong>{{ item.arrivee }}</strong></div>
+          <div class="meta-row">
+            <span>Voyageur :</span>
+            <strong>{{ item.nom_voyageur || "---" }}</strong>
           </div>
-          <div class="meta-row"><span>Voyageur :</span><strong>{{ item.nom_voyageur }}</strong></div>
+
+          <div class="meta-row">
+            <span>Date :</span>
+            <strong>{{ formatDate(item.date_voyage) }}</strong>
+          </div>
+          
+          <div class="meta-row">
+            <span>Classe :</span>
+            <strong>{{ getClasseDisplay(item.classe) }}</strong>
+          </div>
+          
+          <div class="route-display">
+            <div class="station">
+              <span>Départ</span>
+              <strong>{{ item.depart || "---" }}</strong>
+            </div>
+            <div class="route-arrow">→</div>
+            <div class="station">
+              <span>Arrivée</span>
+              <strong>{{ item.arrivee || "---" }}</strong>
+            </div>
+          </div>
         </div>
 
-        <div class="ticket-footer">
+        <div class="ticket-footer" :class="{ 'mobile-footer': isMobile }">
           <span class="price">{{ formatPrice(item.montant) }} MGA</span>
           <div class="actions-zone">
-            <button v-if="item.status === 'actif'" @click.stop="openEditModal(item)" class="card-action-btn edit-btn">
-              ✎ Modifier
+            <button
+              v-if="item.status === 'actif'"
+              @click.stop="openEditModal(item)"
+              class="card-action-btn edit-btn"
+            >
+              ✎
             </button>
-            <button v-if="item.status === 'actif'" @click.stop="emit('remove-item', item.id)" class="card-action-btn remove-btn">
-              ✕ Annuler
+            <button
+              v-if="item.status === 'actif'"
+              @click.stop="handleRemove(item.id)"
+              class="card-action-btn remove-btn"
+            >
+              ✕
             </button>
           </div>
         </div>
@@ -387,37 +520,75 @@ onMounted(() => {
     </div>
 
     <!-- Total -->
-    <div class="cart-summary-footer">
+    <div class="cart-summary-footer" :class="{ 'mobile-summary': isMobile }">
       <div class="total-block">
-        <span class="total-label">Total actif :</span>
-        <span class="total-value">{{ formatPrice(totalActiveAmount) }} MGA</span>
+        <span class="total-label">Total :</span>
+        <span class="total-value"
+          >{{ formatPrice(totalActiveAmount) }} MGA</span
+        >
       </div>
     </div>
 
     <!-- MODALE DÉTAILS -->
-    <div v-if="isModalOpen" class="modal-overlay" @click.self="isModalOpen = false">
-      <div class="modal-content">
+    <div
+      v-if="isModalOpen"
+      class="modal-overlay"
+      @click.self="isModalOpen = false"
+    >
+      <div class="modal-content" :class="{ 'mobile-modal': isMobile }">
         <button class="close-btn" @click="isModalOpen = false">×</button>
         <h3>Détails du Billet</h3>
         <div class="qr-container">
-          <qrcode-vue :value="selectedTicket.num_ticket" :size="160" level="H" render-as="svg" />
+          <qrcode-vue
+            :value="selectedTicket?.num_ticket || ''"
+            :size="isMobile ? 140 : 160"
+            level="H"
+            render-as="svg"
+          />
         </div>
         <div class="ticket-info">
-          <p><strong>Numéro :</strong> {{ selectedTicket.num_ticket }}</p>
-          <p><strong>Voyageur :</strong> {{ selectedTicket.nom_voyageur }}</p>
-          <p><strong>Trajet :</strong> {{ selectedTicket.depart }} → {{ selectedTicket.arrivee }}</p>
-          <p><strong>Classe :</strong> {{ selectedTicket.classe }}</p>
-          <p><strong>Montant :</strong> {{ formatPrice(selectedTicket.montant) }} MGA</p>
+          <p><strong>Numéro :</strong> {{ selectedTicket?.num_ticket }}</p>
+          <p><strong>Voyageur :</strong> {{ selectedTicket?.nom_voyageur }}</p>
+          <p>
+            <strong>Trajet :</strong> {{ selectedTicket?.depart || "---" }} →
+            {{ selectedTicket?.arrivee || "---" }}
+          </p>
+          <p>
+            <strong>Date :</strong>
+            {{ formatDate(selectedTicket?.date_voyage) }}
+          </p>
+          <p>
+            <strong>Classe :</strong>
+            {{ getClasseDisplay(selectedTicket?.classe) }}
+          </p>
+          <p>
+            <strong>Montant :</strong>
+            {{ formatPrice(selectedTicket?.montant) }} MGA
+          </p>
+          <p v-if="selectedTicket?.mineur" class="minor-badge">
+            Voyageur mineur
+          </p>
         </div>
       </div>
     </div>
 
-    <!-- MODALE ÉDITION -->
-    <div v-if="isEditModalOpen" class="modal-overlay" @click.self="closeEditModal">
-      <div class="modal-content edit-modal">
-        <button class="close-btn" @click="closeEditModal" :disabled="isSaving">×</button>
+    <!-- MODALE ÉDITION (inchangée) -->
+    <div
+      v-if="isEditModalOpen"
+      class="modal-overlay"
+      @click.self="closeEditModal"
+    >
+      <div
+        class="modal-content edit-modal"
+        :class="{ 'mobile-modal': isMobile }"
+      >
+        <button class="close-btn" @click="closeEditModal" :disabled="isSaving">
+          ×
+        </button>
         <h3>✎ Modifier le billet</h3>
-        <p class="edit-subtitle">Modifiez les informations du billet {{ editForm.num_ticket }}</p>
+        <p class="edit-subtitle">
+          Modifiez les informations du billet {{ editForm.num_ticket }}
+        </p>
 
         <div v-if="editSuccess" class="edit-success">
           ✅ Billet modifié avec succès !
@@ -426,43 +597,70 @@ onMounted(() => {
         <div class="edit-form">
           <div class="form-group">
             <label>Nom du voyageur *</label>
-            <input v-model="editForm.nom_voyageur" type="text" placeholder="Nom complet" :disabled="isSaving" />
+            <input
+              v-model="editForm.nom_voyageur"
+              type="text"
+              placeholder="Nom complet"
+              :disabled="isSaving"
+            />
           </div>
 
           <div class="form-group checkbox-group">
             <label class="checkbox-label">
-              <input v-model="editForm.mineur" type="checkbox" :disabled="isSaving" />
+              <input
+                v-model="editForm.mineur"
+                type="checkbox"
+                :disabled="isSaving"
+              />
               <span>Le voyageur est mineur</span>
             </label>
           </div>
 
           <div class="form-group">
             <label>Numéro CIN</label>
-            <input 
-              v-model="editForm.cin" 
-              type="text" 
+            <input
+              v-model="editForm.cin"
+              type="text"
               placeholder="Ex: 101 102 103 104"
               :disabled="isSaving"
               maxlength="17"
             />
-            <span class="field-hint">Format: 12 chiffres (ex: 101 102 103 104)</span>
+            <span class="field-hint"
+              >Format: 12 chiffres (ex: 101 102 103 104)</span
+            >
           </div>
 
           <div class="form-row">
             <div class="form-group">
               <label>Départ *</label>
-              <select v-model="editForm.depart" class="select-input" :disabled="isSaving || isLoadingGares">
+              <select
+                v-model="editForm.depart"
+                class="select-input"
+                :disabled="isSaving || isLoadingGares"
+              >
                 <option value="" disabled>Sélectionner</option>
-                <option v-for="gare in garesDepart" :key="gare.pk" :value="gare.nom">
+                <option
+                  v-for="gare in garesDepart"
+                  :key="gare.pk"
+                  :value="gare.nom"
+                >
                   {{ gare.nom }}
                 </option>
               </select>
             </div>
             <div class="form-group">
               <label>Arrivée *</label>
-              <select v-model="editForm.arrivee" class="select-input" :disabled="isSaving || isLoadingGares">
+              <select
+                v-model="editForm.arrivee"
+                class="select-input"
+                :disabled="isSaving || isLoadingGares"
+              >
                 <option value="" disabled>Sélectionner</option>
-                <option v-for="gare in garesArrivee" :key="gare.pk" :value="gare.nom">
+                <option
+                  v-for="gare in garesArrivee"
+                  :key="gare.pk"
+                  :value="gare.nom"
+                >
                   {{ gare.nom }}
                 </option>
               </select>
@@ -472,31 +670,54 @@ onMounted(() => {
           <div class="form-row">
             <div class="form-group">
               <label>Classe</label>
-              <select v-model="editForm.classe" class="select-input" :disabled="isSaving">
+              <select
+                v-model="editForm.classe"
+                class="select-input"
+                :disabled="isSaving"
+              >
                 <option value="1ere">1ère Classe</option>
                 <option value="2eme">2ème Classe</option>
               </select>
             </div>
             <div class="form-group">
               <label>Prix (MGA)</label>
-              <div class="price-display" :class="{ 'price-loading': isLoadingPrice }">
-                <span v-if="isLoadingPrice" class="loading-text-price">Calcul...</span>
-                <span v-else-if="prixCalcule" class="price-calculated">{{ formatPrice(prixCalcule) }}</span>
+              <div
+                class="price-display"
+                :class="{ 'price-loading': isLoadingPrice }"
+              >
+                <span v-if="isLoadingPrice" class="loading-text-price"
+                  >Calcul...</span
+                >
+                <span v-else-if="prixCalcule" class="price-calculated">{{
+                  formatPrice(prixCalcule)
+                }}</span>
                 <span v-else class="price-empty">Sélectionnez un trajet</span>
               </div>
             </div>
           </div>
 
-          <div v-if="editError" class="edit-error">
-            ⚠️ {{ editError }}
-          </div>
+          <div v-if="editError" class="edit-error">⚠️ {{ editError }}</div>
 
           <div class="edit-actions">
-            <button class="btn-cancel" @click="closeEditModal" :disabled="isSaving">
+            <button
+              class="btn-cancel"
+              @click="closeEditModal"
+              :disabled="isSaving"
+            >
               Annuler
             </button>
-            <button class="btn-save" @click="saveEdit" :disabled="isSaving || !prixCalcule || !editForm.nom_voyageur || !editForm.depart || !editForm.arrivee">
-              {{ isSaving ? 'Enregistrement...' : 'Enregistrer' }}
+            <button
+              class="btn-save"
+              @click="saveEdit"
+              :disabled="
+                isSaving ||
+                !prixCalcule ||
+                !editForm.nom_voyageur ||
+                !editForm.depart ||
+                !editForm.arrivee
+              "
+            >
+              {{ isSaving ? "Enregistrement..." : "Enregistrer" }}
             </button>
           </div>
         </div>
@@ -506,6 +727,7 @@ onMounted(() => {
 </template>
 
 <style scoped>
+/* ===== STYLES EXISTANTS (inchangés) ===== */
 .cart-panel-container {
   display: flex;
   flex-direction: column;
@@ -591,6 +813,24 @@ onMounted(() => {
   color: #ffffff;
 }
 
+.notice-bar {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #f8fafc;
+  border-left: 4px solid #0f172a;
+  padding: 12px 16px;
+  border-radius: 0 8px 8px 0;
+  font-size: 0.88rem;
+  color: #334155;
+  line-height: 1.5;
+}
+
+.notice-bar span:first-child {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
 .cart-grid-layout {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -608,13 +848,19 @@ onMounted(() => {
   flex-direction: column;
   position: relative;
   box-shadow: 0 2px 6px rgba(23, 33, 31, 0.03);
-  transition: transform 0.15s, box-shadow 0.15s;
+  transition:
+    transform 0.15s,
+    box-shadow 0.15s;
   cursor: pointer;
 }
 
 .ticket-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(23, 33, 31, 0.06);
+}
+
+.ticket-card:active {
+  transform: scale(0.98);
 }
 
 .ticket-card.status-inactif {
@@ -662,7 +908,7 @@ onMounted(() => {
   padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   flex-grow: 1;
 }
 
@@ -702,6 +948,47 @@ onMounted(() => {
 
 .status-inactif .route-arrow {
   color: #889894;
+}
+
+/* ===== META INFOS ===== */
+.ticket-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 4px;
+  background: #f8faf8;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.meta-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.7rem;
+  text-align: center;
+}
+
+.meta-icon {
+  font-size: 0.85rem;
+}
+
+.meta-label {
+  color: #889894;
+  font-weight: 500;
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.meta-value {
+  font-weight: 600;
+  color: #17211f;
+  font-size: 0.75rem;
+}
+
+.meta-value.first-class {
+  color: #b8860b;
 }
 
 .meta-row {
@@ -754,6 +1041,11 @@ onMounted(() => {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.12s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.card-action-btn:active {
+  transform: scale(0.92);
 }
 
 .edit-btn {
@@ -813,8 +1105,12 @@ onMounted(() => {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .modal-content {
@@ -878,6 +1174,16 @@ onMounted(() => {
 .ticket-info p {
   margin: 6px 0;
   color: #17211f;
+}
+
+.ticket-info .minor-badge {
+  color: #f08c00;
+  background: #fff9db;
+  padding: 4px 12px;
+  border-radius: 4px;
+  display: inline-block;
+  font-weight: 700;
+  font-size: 0.8rem;
 }
 
 /* ===== MODALE ÉDITION ===== */
@@ -1078,115 +1384,170 @@ onMounted(() => {
   cursor: not-allowed;
 }
 
-/* ===== RESPONSIVE ===== */
-@media (max-width: 768px) {
-  .cart-header-actions {
+/* ===== MOBILE STYLES ===== */
+.mobile-cart .cart-header-actions {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.mobile-cart .filter-bar {
+  flex-direction: column;
+  align-items: stretch;
+  padding: 8px 12px;
+}
+
+.mobile-cart .filter-options {
+  justify-content: center;
+}
+
+.mobile-cart .btn-refresh-cart {
+  justify-content: center;
+  padding: 8px;
+}
+
+.mobile-notice {
+  padding: 10px 12px;
+  font-size: 0.78rem;
+  gap: 8px;
+}
+
+.mobile-grid {
+  grid-template-columns: 1fr;
+  max-height: none;
+  padding: 0;
+}
+
+.mobile-ticket {
+  border-radius: 8px;
+}
+
+.mobile-ticket .ticket-header {
+  padding: 8px 12px;
+}
+
+.mobile-ticket .ticket-id {
+  font-size: 0.75rem;
+}
+
+.mobile-ticket .ticket-body {
+  padding: 10px 12px;
+  gap: 6px;
+}
+
+.mobile-ticket .station strong {
+  font-size: 0.82rem;
+}
+
+.mobile-ticket .route-arrow {
+  font-size: 0.75rem;
+}
+
+.mobile-ticket .ticket-meta {
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 6px 8px;
+}
+
+.mobile-ticket .meta-item {
+  font-size: 0.65rem;
+}
+
+.mobile-ticket .meta-row {
+  font-size: 0.72rem;
+}
+
+.mobile-ticket .meta-row strong {
+  max-width: 120px;
+}
+
+.mobile-footer {
+  padding: 8px 12px;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mobile-footer .price {
+  font-size: 0.95rem;
+}
+
+.mobile-footer .card-action-btn {
+  padding: 6px 10px;
+  font-size: 0.8rem;
+}
+
+.mobile-summary {
+  padding: 10px 12px;
+}
+
+.mobile-summary .total-value {
+  font-size: 1.1rem;
+}
+
+.mobile-modal {
+  padding: 20px;
+  max-width: 95%;
+}
+
+.mobile-modal .qr-container {
+  padding: 10px;
+}
+
+.mobile-modal .ticket-info p {
+  font-size: 0.8rem;
+}
+
+.mobile-modal .edit-form {
+  gap: 10px;
+}
+
+.mobile-modal .form-row {
+  grid-template-columns: 1fr;
+}
+
+.mobile-modal .edit-actions {
+  grid-template-columns: 1fr;
+}
+
+@media (max-width: 480px) {
+  .cart-panel-container {
+    gap: 10px;
+  }
+
+  .filter-chip {
+    font-size: 0.7rem;
+    padding: 3px 10px;
+  }
+
+  .mobile-ticket .ticket-footer {
     flex-direction: column;
+    gap: 6px;
     align-items: stretch;
   }
 
-  .filter-bar {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .filter-options {
+  .mobile-ticket .actions-zone {
     justify-content: center;
   }
 
-  .cart-grid-layout {
-    grid-template-columns: 1fr;
-    max-height: none;
+  .mobile-ticket .station strong {
+    font-size: 0.75rem;
   }
 
-  .edit-modal {
-    width: 100%;
-    padding: 20px;
-  }
-
-  .form-row {
+  .mobile-ticket .ticket-meta {
     grid-template-columns: 1fr;
   }
 
-  .edit-actions {
-    grid-template-columns: 1fr;
+  .modal-content {
+    padding: 16px;
   }
 
   .modal-content:not(.edit-modal) {
     width: 100%;
-    padding: 20px;
-  }
-}
-
-@media (max-width: 480px) {
-  .ticket-footer {
-    flex-direction: column;
-    gap: 8px;
-    align-items: stretch;
   }
 
-  .actions-zone {
-    justify-content: center;
-  }
-
-  .station strong {
-    font-size: 0.8rem;
+  .edit-modal {
+    width: 100%;
+    padding: 16px;
   }
 }
 </style>
-/* ===== RESPONSIVE TICKET CART ===== */
-
-@media (max-width: 768px) {
-  .cart-header-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .filter-bar {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .filter-options {
-    justify-content: center;
-  }
-
-  .cart-grid-layout {
-    grid-template-columns: 1fr;
-    max-height: none;
-  }
-
-  .edit-modal {
-    width: 100%;
-    padding: 20px;
-  }
-
-  .form-row {
-    grid-template-columns: 1fr;
-  }
-
-  .edit-actions {
-    grid-template-columns: 1fr;
-  }
-
-  .modal-content:not(.edit-modal) {
-    width: 100%;
-    padding: 20px;
-  }
-}
-
-@media (max-width: 480px) {
-  .ticket-footer {
-    flex-direction: column;
-    gap: 8px;
-    align-items: stretch;
-  }
-
-  .actions-zone {
-    justify-content: center;
-  }
-
-  .station strong {
-    font-size: 0.8rem;
-  }
-}

@@ -1,6 +1,7 @@
-<!-- DashboardPage.vue -->
+<!-- DashboardPage.vue - Version Mobile Complète -->
 <script setup>
-import { computed, ref, onMounted, onUnmounted } from "vue";
+import Footer from './Footer.vue'
+import { computed, ref, onMounted, onUnmounted, onBeforeUnmount } from "vue";
 import { useRouter } from "vue-router";
 import BookingDashboard from "./BookingDashboard.vue";
 import TicketCartPanel from "./TicketCartPanel.vue";
@@ -12,15 +13,34 @@ const router = useRouter();
 const trains = ref([]);
 const isLoadingTrains = ref(false);
 const trainError = ref("");
-const selectedTrain = ref(""); // ← Initialisé comme chaîne vide
+const selectedTrain = ref("");
 const cartItems = ref([]);
 const showCartPage = ref(false);
 const showToast = ref(false);
 const toastMessage = ref("");
 const editingTicket = ref(null);
+const isMobileMenuOpen = ref(false);
 let toastTimeoutId = null;
 let refreshInterval = null;
 
+// Détection mobile
+const isMobile = ref(false);
+
+function checkMobile() {
+  isMobile.value = window.innerWidth <= 768;
+}
+function selectTrain(trainId) {
+  console.log("🔄 Dashboard: sélection du train:", trainId);
+  selectedTrain.value = trainId || "";
+
+  // Optionnel: mettre à jour le train actif
+  if (trainId) {
+    const train = trains.value.find((t) => t.id === trainId);
+    if (train) {
+      console.log("✅ Train actif mis à jour:", train);
+    }
+  }
+}
 // ===== TOAST =====
 function triggerToast(message, duration = 3000) {
   toastMessage.value = message;
@@ -49,17 +69,16 @@ async function loadTrainsFromSupabase() {
 
     if (error) throw error;
     trains.value = data || [];
-    
-    // Correction : Vérifier que trains a des éléments avant d'assigner
+
     if (trains.value.length > 0) {
       selectedTrain.value = trains.value[0].id;
     } else {
-      selectedTrain.value = ""; // ← Toujours une chaîne, jamais undefined
+      selectedTrain.value = "";
     }
   } catch (error) {
     console.error("Erreur voyages:", error.message);
     trainError.value = "Impossible de charger les voyages actifs.";
-    selectedTrain.value = ""; // ← En cas d'erreur, mettre une chaîne vide
+    selectedTrain.value = "";
   } finally {
     isLoadingTrains.value = false;
   }
@@ -87,7 +106,6 @@ async function loadCartFromSupabase() {
 
     if (error) throw error;
     cartItems.value = data || [];
-    console.log('📦 Panier chargé:', cartItems.value.length, 'billets');
   } catch (error) {
     console.error("Erreur panier:", error);
     cartItems.value = [];
@@ -109,8 +127,12 @@ function startAutoRefresh() {
 
 // ===== ACTIONS PANIER =====
 async function handleDeleteItem(ticketId) {
-  const confirmDelete = confirm("Voulez-vous vraiment supprimer ce billet ?");
-  if (!confirmDelete) return;
+  if (isMobile.value) {
+    // Utiliser un dialog personnalisé sur mobile
+    if (!confirm("Voulez-vous vraiment supprimer ce billet ?")) return;
+  } else {
+    if (!confirm("Voulez-vous vraiment supprimer ce billet ?")) return;
+  }
 
   try {
     const { error } = await supabaseClient
@@ -124,31 +146,27 @@ async function handleDeleteItem(ticketId) {
     await loadCartFromSupabase();
   } catch (error) {
     console.error("Erreur lors de la suppression :", error.message);
-    alert("Impossible de supprimer le billet.");
+    triggerToast("Impossible de supprimer le billet.", 3000);
   }
 }
 
 // ===== GESTION DE L'ÉDITION =====
 function handleEditItem(ticket) {
-  console.log('📝 Édition du ticket:', ticket);
-  const index = cartItems.value.findIndex(item => item.id === ticket.id);
+  const index = cartItems.value.findIndex((item) => item.id === ticket.id);
   if (index !== -1) {
     cartItems.value[index] = { ...cartItems.value[index], ...ticket };
-    console.log('✅ Ticket mis à jour dans la liste locale');
   } else {
-    console.log('🔄 Ticket non trouvé, rechargement complet');
     loadCartFromSupabase();
   }
-  
+
   triggerToast(
     `Le billet de ${ticket.nom_voyageur || "du voyageur"} a été modifié avec succès.`,
-    3000
+    3000,
   );
 }
 
 // ===== CALCULS =====
 const activeTrain = computed(() => {
-  // Vérifier que selectedTrain.value est une chaîne non vide
   if (!selectedTrain.value || !trains.value.length) return null;
   return trains.value.find((t) => t.id === selectedTrain.value) || null;
 });
@@ -180,33 +198,43 @@ async function handleTicketSaved(newTicket) {
   editingTicket.value = null;
   triggerToast(
     `Le billet de ${newTicket?.nom_voyageur || "du voyageur"} a été validé et enregistré.`,
-    4000
+    4000,
   );
 }
 
-function selectTrain(trainId) {
-  // S'assurer que trainId est une chaîne
-  selectedTrain.value = trainId || "";
+// function selectTrain(trainId) {
+//   selectedTrain.value = trainId || "";
+//   // Sur mobile, fermer le menu si ouvert
+//   if (isMobile.value) {
+//     isMobileMenuOpen.value = false;
+//   }
+// }
+
+function toggleMobileMenu() {
+  isMobileMenuOpen.value = !isMobileMenuOpen.value;
 }
 
 // ===== NETTOYAGE =====
-onUnmounted(() => {
+onBeforeUnmount(() => {
   if (refreshInterval) {
     clearInterval(refreshInterval);
   }
   if (toastTimeoutId) {
     clearTimeout(toastTimeoutId);
   }
+  window.removeEventListener("resize", checkMobile);
 });
 
 // ===== INITIALISATION =====
 onMounted(() => {
+  checkMobile();
+  window.addEventListener("resize", checkMobile);
   loadTrainsFromSupabase();
   loadCartFromSupabase();
-  startAutoRefresh();
-  
-  window.addEventListener('storage', (e) => {
-    if (e.key === 'rail_user_session') {
+  // startAutoRefresh();
+
+  window.addEventListener("storage", (e) => {
+    if (e.key === "rail_user_session") {
       loadCartFromSupabase();
     }
   });
@@ -216,7 +244,7 @@ onMounted(() => {
 <template>
   <div class="dashboard-root-layout">
     <!-- BARRE DE NAVIGATION SUPÉRIEURE -->
-    <header class="app-top-navbar">
+    <header class="app-top-navbar" :class="{ 'mobile-nav': isMobile }">
       <div class="navbar-brand">
         <span class="brand-logo-indicator"></span>
         <div class="brand-text-group">
@@ -225,7 +253,8 @@ onMounted(() => {
         </div>
       </div>
 
-      <nav class="navbar-actions">
+      <!-- Version Desktop -->
+      <nav v-if="!isMobile" class="navbar-actions">
         <button
           class="nav-toggle-btn"
           :class="{ active: !showCartPage }"
@@ -238,17 +267,13 @@ onMounted(() => {
           :class="{ active: showCartPage }"
           @click="showCartPage = true"
         >
-          Panier / Billets
+          Billets
           <span v-if="cartBadgeCount > 0" class="badge-count-indicator">
             {{ cartBadgeCount }}
           </span>
         </button>
 
-        <router-link
-          to="/profile"
-          class="user-profile-link"
-          title="Voir mon profil"
-        >
+        <router-link to="/profile" class="user-profile-link">
           <div class="user-profile-summary">
             <div class="avatar-placeholder">
               {{ user.name.charAt(0).toUpperCase() }}
@@ -260,11 +285,66 @@ onMounted(() => {
           </div>
         </router-link>
       </nav>
+
+      <!-- Version Mobile -->
+      <div v-else class="mobile-nav-actions">
+        <button
+          class="mobile-cart-btn position-relative"
+          @click="showCartPage = !showCartPage"
+        >
+          🎫
+          <span v-if="cartBadgeCount > 0" class="badge-count-indicator">
+            {{ cartBadgeCount }}
+          </span>
+        </button>
+        <button class="mobile-menu-btn" @click="toggleMobileMenu">☰</button>
+      </div>
+
+      <!-- Menu Mobile -->
+      <div v-if="isMobile && isMobileMenuOpen" class="mobile-menu">
+        <button
+          class="mobile-menu-item"
+          :class="{ active: !showCartPage }"
+          @click="
+            showCartPage = false;
+            isMobileMenuOpen = false;
+          "
+        >
+          📋 Réservation
+        </button>
+        <button
+          class="mobile-menu-item"
+          :class="{ active: showCartPage }"
+          @click="
+            showCartPage = true;
+            isMobileMenuOpen = false;
+          "
+        >
+          🎫 Billets
+          <span v-if="cartBadgeCount > 0" class="badge-count-mobile">
+            {{ cartBadgeCount }}
+          </span>
+        </button>
+        <router-link
+          to="/profile"
+          class="mobile-menu-item mobile-profile-link"
+          @click="isMobileMenuOpen = false"
+        >
+          👤 {{ user.name }}
+        </router-link>
+        <button class="mobile-menu-item mobile-logout" @click="logout">
+          🚪 Déconnexion
+        </button>
+      </div>
     </header>
 
     <!-- TOAST NOTIFICATION -->
     <Transition name="toast-fade">
-      <div v-if="showToast" class="toast-notification">
+      <div
+        v-if="showToast"
+        class="toast-notification"
+        :class="{ 'mobile-toast': isMobile }"
+      >
         <div class="toast-content">
           <p>{{ toastMessage }}</p>
         </div>
@@ -272,7 +352,10 @@ onMounted(() => {
     </Transition>
 
     <!-- ZONE DE CONTENU PRINCIPAL -->
-    <main class="dashboard-main-content">
+    <main
+      class="dashboard-main-content"
+      :class="{ 'mobile-content': isMobile }"
+    >
       <!-- Message d'erreur -->
       <div v-if="trainError" class="error-state">
         <div class="error-icon">⚠️</div>
@@ -284,7 +367,10 @@ onMounted(() => {
       </div>
 
       <!-- Aucun train disponible -->
-      <div v-else-if="!isLoadingTrains && trains.length === 0 && !showCartPage" class="empty-state">
+      <div
+        v-else-if="!isLoadingTrains && trains.length === 0 && !showCartPage"
+        class="empty-state"
+      >
         <div class="empty-state-icon">🚂</div>
         <h2>Aucun départ planifié</h2>
         <p>
@@ -293,13 +379,7 @@ onMounted(() => {
         </p>
         <div class="empty-state-actions">
           <button @click="loadTrainsFromSupabase" class="btn-refresh">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M23 4v6h-6" />
-              <path d="M1 20v-6h6" />
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10" />
-              <path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14" />
-            </svg>
-            Actualiser
+            🔄 Actualiser
           </button>
           <router-link to="/profile" class="btn-secondary-outline">
             Voir mon profil
@@ -321,6 +401,7 @@ onMounted(() => {
           :active-train="activeTrain"
           :user="user"
           :editing-ticket="editingTicket"
+          :is-mobile="isMobile"
           @select-train="selectTrain"
           @ticket-saved="handleTicketSaved"
         />
@@ -329,18 +410,20 @@ onMounted(() => {
       <!-- Panier -->
       <div v-else class="cart-section">
         <div class="section-title-block">
-          <h2>Historique récent des encaissements</h2>
-          <p>Retrouvez la liste complète des titres émis au guichet.</p>
+          <h2>Mes Billets</h2>
+          <p>Retrouvez la liste de vos titres de transport.</p>
         </div>
 
         <TicketCartPanel
           :cart-items="cartItems"
+          :is-mobile="isMobile"
           @remove-item="handleDeleteItem"
           @edit-item="handleEditItem"
           @refresh="loadCartFromSupabase"
         />
       </div>
     </main>
+    <Footer/>
   </div>
 </template>
 
@@ -351,8 +434,7 @@ onMounted(() => {
   background-color: #eef2ed;
   display: flex;
   flex-direction: column;
-  font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
 }
 
 /* ===== NAVBAR ===== */
@@ -363,6 +445,9 @@ onMounted(() => {
   background: #ffffff;
   padding: 12px 24px;
   border-bottom: 1px solid #dce5dd;
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
 .navbar-brand {
@@ -486,14 +571,132 @@ onMounted(() => {
   color: #667672;
 }
 
+/* ===== NAVBAR MOBILE ===== */
+.mobile-nav {
+  padding: 10px 16px;
+}
+
+.mobile-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mobile-cart-btn {
+  background: transparent;
+  border: none;
+  font-size: 1.3rem;
+  padding: 8px;
+  cursor: pointer;
+  position: relative;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.mobile-cart-btn:active {
+  background: #f1f4f1;
+}
+
+.mobile-menu-btn {
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.mobile-menu-btn:active {
+  background: #f1f4f1;
+}
+
+/* ===== MENU MOBILE ===== */
+.mobile-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border-bottom: 1px solid #dce5dd;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  padding: 8px 0;
+  animation: slideDown 0.2s ease;
+  z-index: 99;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.mobile-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 20px;
+  background: transparent;
+  border: none;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #17211f;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-menu-item:active {
+  background: #f4f8f5;
+}
+
+.mobile-menu-item.active {
+  background: #eaf6f2;
+  color: #24746c;
+}
+
+.mobile-profile-link {
+  border-top: 1px solid #f1f4f1;
+  margin-top: 4px;
+  padding-top: 12px;
+}
+
+.mobile-logout {
+  color: #dc2626;
+  border-top: 1px solid #f1f4f1;
+  margin-top: 4px;
+  padding-top: 12px;
+}
+
+.badge-count-mobile {
+  margin-left: auto;
+  background: #24746c;
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
 /* ===== CONTENU PRINCIPAL ===== */
 .dashboard-main-content {
   flex-grow: 1;
-  padding: 24px;
+  /* padding: 24px; */
   max-width: 1280px;
   width: 100%;
   margin: 0 auto;
   box-sizing: border-box;
+}
+
+.mobile-content {
+  padding: 16px 12px;
 }
 
 .section-title-block {
@@ -615,9 +818,8 @@ onMounted(() => {
   transition: all 0.3s ease;
 }
 
-.btn-refresh:hover {
-  background: #1b5e58;
-  transform: translateY(-2px);
+.btn-refresh:active {
+  transform: scale(0.97);
 }
 
 .btn-secondary-outline {
@@ -632,11 +834,6 @@ onMounted(() => {
   font-size: 0.95rem;
   text-decoration: none;
   transition: all 0.3s ease;
-}
-
-.btn-secondary-outline:hover {
-  background: #eaf6f2;
-  transform: translateY(-2px);
 }
 
 .loading-state {
@@ -666,8 +863,12 @@ onMounted(() => {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* ===== TOAST ===== */
@@ -683,6 +884,14 @@ onMounted(() => {
   z-index: 9999;
   max-width: 380px;
   pointer-events: none;
+}
+
+.mobile-toast {
+  bottom: 16px;
+  right: 16px;
+  left: 16px;
+  max-width: none;
+  padding: 12px 16px;
 }
 
 .toast-content p {
@@ -722,125 +931,21 @@ onMounted(() => {
   }
 }
 
-@media (max-width: 560px) {
-  .dashboard-main-content {
-    padding: 16px;
-  }
-
-  .empty-state {
-    padding: 40px 16px;
-    min-height: 200px;
-  }
-
-  .empty-state-icon {
-    font-size: 3rem;
-  }
-
-  .empty-state h2 {
-    font-size: 1.2rem;
-  }
-
-  .empty-state-actions {
-    flex-direction: column;
-    width: 100%;
-  }
-
-  .btn-refresh,
-  .btn-secondary-outline {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .error-state {
-    padding: 40px 16px;
-    min-height: 200px;
-  }
-
-  .loading-state {
-    padding: 40px 16px;
-    min-height: 200px;
-  }
-
-  .toast-notification {
-    bottom: 16px;
-    right: 16px;
-    left: 16px;
-    max-width: none;
-  }
-}
-</style>
-
-<style scoped>
-/* ===== RESPONSIVE DASHBOARD ===== */
-
-/* Tablette */
-@media (max-width: 940px) {
-  .app-top-navbar {
-    flex-wrap: wrap;
-    gap: 12px;
-    padding: 12px 16px;
-  }
-
-  .navbar-actions {
-    flex-wrap: wrap;
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .user-profile-link {
-    padding-left: 8px;
-  }
-  
-  .dashboard-main-content {
-    padding: 16px;
-  }
-  
-  .dashboard-grid {
-    grid-template-columns: 1fr !important;
-  }
-  
-  .grid-pane {
-    min-height: 300px !important;
-    padding: 16px !important;
-  }
-}
-
-/* Mobile */
-@media (max-width: 560px) {
+@media (max-width: 768px) {
   .dashboard-main-content {
     padding: 12px;
   }
-  
+
   .app-top-navbar {
     padding: 10px 12px;
   }
-  
+
   .navbar-brand h1 {
     font-size: 1rem;
   }
-  
+
   .navbar-brand p {
     font-size: 0.65rem;
-  }
-  
-  .nav-toggle-btn {
-    font-size: 0.75rem;
-    padding: 6px 10px;
-  }
-  
-  .user-meta-info {
-    display: none;
-  }
-  
-  .avatar-placeholder {
-    width: 28px;
-    height: 28px;
-    font-size: 0.7rem;
-  }
-  
-  .user-profile-summary {
-    padding-left: 8px;
-    border-left: none;
   }
 
   .empty-state {
@@ -877,20 +982,78 @@ onMounted(() => {
     min-height: 200px;
   }
 
-  .toast-notification {
-    bottom: 16px;
-    right: 16px;
-    left: 16px;
-    max-width: none;
-  }
-  
   .section-title-block h2 {
     font-size: 1.1rem;
   }
-  
+
   .section-title-block p {
     font-size: 0.8rem;
   }
 }
-</style>
 
+@media (max-width: 480px) {
+  .dashboard-main-content {
+    padding: 8px;
+  }
+
+  .app-top-navbar {
+    padding: 8px 12px;
+  }
+
+  .navbar-brand h1 {
+    font-size: 0.9rem;
+  }
+
+  .navbar-brand p {
+    font-size: 0.6rem;
+  }
+
+  .brand-logo-indicator {
+    width: 6px;
+    height: 18px;
+  }
+
+  .mobile-nav-actions {
+    gap: 8px;
+  }
+
+  .mobile-cart-btn {
+    font-size: 1.1rem;
+    padding: 6px;
+  }
+
+  .mobile-menu-btn {
+    font-size: 1.3rem;
+    padding: 2px 6px;
+  }
+
+  .mobile-menu-item {
+    padding: 10px 16px;
+    font-size: 0.85rem;
+  }
+
+  .empty-state {
+    padding: 20px 12px;
+    min-height: 150px;
+  }
+
+  .empty-state-icon {
+    font-size: 2.5rem;
+  }
+
+  .empty-state h2 {
+    font-size: 1rem;
+  }
+
+  .empty-state p {
+    font-size: 0.85rem;
+  }
+
+  .toast-notification {
+    bottom: 12px;
+    right: 12px;
+    left: 12px;
+    padding: 10px 14px;
+  }
+}
+</style>

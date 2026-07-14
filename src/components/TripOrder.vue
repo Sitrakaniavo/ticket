@@ -16,6 +16,10 @@ const props = defineProps({
   editingTicket: {
     type: Object,
     default: null,
+  },
+  isMobile: {
+    type: Boolean,
+    default: false,
   }
 });
 
@@ -25,6 +29,7 @@ const emit = defineEmits(["ticket-saved", "ticket-updated"]);
 const isSaving = ref(false);
 const errorMessage = ref("");
 const isEditing = ref(false);
+const showPreview = ref(false);
 
 // Formulaire réactif initialisé localement
 const form = reactive({
@@ -60,15 +65,10 @@ watch(
   (newValue) => {
     if (!newValue) return;
 
-    // 1. Ne garder que les chiffres
     let digits = newValue.replace(/\D/g, "");
-
-    // 2. Limiter à 12 chiffres maximum
     if (digits.length > 12) {
       digits = digits.slice(0, 12);
     }
-
-    // 3. Découper par blocs de 3 chiffres et les joindre avec un espace
     const blocks = digits.match(/.{1,3}/g);
     form.cin = blocks ? blocks.join(" ") : digits;
   },
@@ -233,6 +233,7 @@ async function handleSubmit() {
     form.arrivee = "";
     isEditing.value = false;
     refreshTicketSeed();
+    showPreview.value = false;
 
     // Émettre l'événement pour mettre à jour la liste
     emit("ticket-saved", data);
@@ -254,6 +255,7 @@ function resetForm() {
   isEditing.value = false;
   errorMessage.value = "";
   refreshTicketSeed();
+  showPreview.value = false;
 }
 
 // Exposer les fonctions pour le parent
@@ -261,132 +263,266 @@ defineExpose({
   resetForm,
   loadTicketForEdit
 });
+
+// Toggle preview on mobile
+function togglePreview() {
+  showPreview.value = !showPreview.value;
+}
 </script>
 
 <template>
-  <div class="order-grid-container">
-    <section class="summary-panel-compact">
-      <p v-if="errorMessage" class="error-msg">⚠️ {{ errorMessage }}</p>
-      <div class="section-heading-compact">
-        <h2>{{ isEditing ? 'Modifier le billet' : 'Détails du voyageur' }}</h2>
-        <button v-if="isEditing" @click="resetForm" class="btn-cancel-edit">
-          Annuler
-        </button>
-      </div>
+  <div class="order-grid-container" :class="{ 'mobile-order': isMobile }">
+    <!-- Version Desktop: Grille 2 colonnes -->
+    <template v-if="!isMobile">
+      <section class="summary-panel-compact">
+        <p v-if="errorMessage" class="error-msg">⚠️ {{ errorMessage }}</p>
+        <div class="section-heading-compact">
+          <h2>{{ isEditing ? 'Modifier le billet' : 'Détails du voyageur' }}</h2>
+          <button v-if="isEditing" @click="resetForm" class="btn-cancel-edit">
+            Annuler
+          </button>
+        </div>
 
-      <form @submit.prevent="handleSubmit" class="ticket-form-compact">
-        <label class="form-field">
-          <span class="field-label">Nom du voyageur</span>
-          <input
-            v-model="form.nom_voyageur"
-            type="text"
-            placeholder="Ex: Rabe Hery"
+        <form @submit.prevent="handleSubmit" class="ticket-form-compact">
+          <label class="form-field">
+            <span class="field-label">Nom du voyageur</span>
+            <input
+              v-model="form.nom_voyageur"
+              type="text"
+              placeholder="Ex: Rabe Hery"
+              :disabled="isSaving"
+              required
+            />
+          </label>
+
+          <label class="checkbox-field">
+            <input v-model="form.mineur" type="checkbox" :disabled="isSaving" />
+            <span class="field-label">Le voyageur est mineur</span>
+          </label>
+
+          <label class="form-field">
+            <span class="field-label">Numéro CIN <span class="required">*</span></span>
+            <input
+              v-model="form.cin"
+              type="text"
+              :placeholder="form.mineur ? 'Ex: CIN du tuteur' : 'Ex: 101 102 103 104'"
+              :disabled="isSaving"
+              :required="!form.mineur"
+            />
+          </label>
+
+          <div class="form-row">
+            <label class="form-field">
+              <span class="field-label">Départ</span>
+              <select
+                v-model="form.depart"
+                class="select-input"
+                :disabled="isSaving"
+                required
+              >
+                <option value="" disabled>Sélectionner</option>
+                <option
+                  v-for="gare in destinationTrains"
+                  :key="gare.pk"
+                  :value="gare.nom"
+                >
+                  {{ gare.nom }}
+                </option>
+              </select>
+            </label>
+
+            <label class="form-field">
+              <span class="field-label">Arrivée</span>
+              <select
+                v-model="form.arrivee"
+                class="select-input"
+                :disabled="isSaving"
+                required
+              >
+                <option value="" disabled>Sélectionner</option>
+                <option
+                  v-for="gare in garesArriveePossibles"
+                  :key="gare.pk"
+                  :value="gare.nom"
+                >
+                  {{ gare.nom }}
+                </option>
+              </select>
+            </label>
+          </div>
+
+          <div class="form-row">
+            <label class="form-field">
+              <span class="field-label">Classe</span>
+              <select
+                v-model="form.classe"
+                class="select-input"
+                :disabled="isSaving"
+                required
+              >
+                <option value="1ere">1ère classe</option>
+                <option value="2eme">2ème classe</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="price-display-block">
+            <span class="price-label">Prix estimé</span>
+            <span class="price-value">{{ displayedPrice }} MGA</span>
+          </div>
+
+          <button 
+            type="submit" 
+            class="submit-btn" 
             :disabled="isSaving"
-            required
-          />
-        </label>
-
-        <label class="checkbox-field">
-          <input v-model="form.mineur" type="checkbox" :disabled="isSaving" />
-          <span class="field-label">Le voyageur est mineur</span>
-        </label>
-
-        <label class="form-field">
-          <span class="field-label"
-            >Numéro CIN <span class="required">*</span></span
           >
-          <input
-            v-model="form.cin"
-            type="text"
-            :placeholder="
-              form.mineur ? 'Ex: CIN du tuteur' : 'Ex: 101 102 103 104'
-            "
-            :disabled="isSaving"
-            :required="!form.mineur"
+            {{ isSaving ? 'Enregistrement...' : isEditing ? 'Mettre à jour' : 'Enregistrer le billet' }}
+          </button>
+        </form>
+      </section>
+
+      <TicketPreviewPanel
+        :preview-data="ticketPreviewData"
+        :is-editing="isEditing"
+        :class="{ 'panel-disabled': isSaving }"
+        @submit="handleSubmit"
+      />
+    </template>
+
+    <!-- Version Mobile: Stack vertical -->
+    <template v-else>
+      <section class="summary-panel-compact mobile-summary">
+        <p v-if="errorMessage" class="error-msg">⚠️ {{ errorMessage }}</p>
+        
+        <div class="section-heading-compact">
+          <h2>{{ isEditing ? 'Modifier le billet' : 'Détails du voyageur' }}</h2>
+          <button v-if="isEditing" @click="resetForm" class="btn-cancel-edit">
+            Annuler
+          </button>
+        </div>
+
+        <form @submit.prevent="handleSubmit" class="ticket-form-compact">
+          <label class="form-field">
+            <span class="field-label">Nom du voyageur</span>
+            <input
+              v-model="form.nom_voyageur"
+              type="text"
+              placeholder="Ex: Rabe Hery"
+              :disabled="isSaving"
+              required
+            />
+          </label>
+
+          <label class="checkbox-field">
+            <input v-model="form.mineur" type="checkbox" :disabled="isSaving" />
+            <span class="field-label">Le voyageur est mineur</span>
+          </label>
+
+          <label class="form-field">
+            <span class="field-label">Numéro CIN <span class="required">*</span></span>
+            <input
+              v-model="form.cin"
+              type="text"
+              :placeholder="form.mineur ? 'Ex: CIN du tuteur' : 'Ex: 101 102 103 104'"
+              :disabled="isSaving"
+              :required="!form.mineur"
+            />
+          </label>
+
+          <div class="form-row">
+            <label class="form-field">
+              <span class="field-label">Départ</span>
+              <select
+                v-model="form.depart"
+                class="select-input"
+                :disabled="isSaving"
+                required
+              >
+                <option value="" disabled>Sélectionner</option>
+                <option
+                  v-for="gare in destinationTrains"
+                  :key="gare.pk"
+                  :value="gare.nom"
+                >
+                  {{ gare.nom }}
+                </option>
+              </select>
+            </label>
+
+            <label class="form-field">
+              <span class="field-label">Arrivée</span>
+              <select
+                v-model="form.arrivee"
+                class="select-input"
+                :disabled="isSaving"
+                required
+              >
+                <option value="" disabled>Sélectionner</option>
+                <option
+                  v-for="gare in garesArriveePossibles"
+                  :key="gare.pk"
+                  :value="gare.nom"
+                >
+                  {{ gare.nom }}
+                </option>
+              </select>
+            </label>
+          </div>
+
+          <div class="form-row">
+            <label class="form-field">
+              <span class="field-label">Classe</span>
+              <select
+                v-model="form.classe"
+                class="select-input"
+                :disabled="isSaving"
+                required
+              >
+                <option value="1ere">1ère classe</option>
+                <option value="2eme">2ème classe</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="price-display-block">
+            <span class="price-label">Prix estimé</span>
+            <span class="price-value">{{ displayedPrice }} MGA</span>
+          </div>
+
+          <div class="mobile-actions">
+            <button 
+              type="button"
+              class="btn-preview"
+              @click="togglePreview"
+            >
+              {{ showPreview ? 'Masquer l\'aperçu' : 'Voir l\'aperçu' }}
+            </button>
+            <button 
+              type="submit" 
+              class="submit-btn" 
+              :disabled="isSaving"
+            >
+              {{ isSaving ? 'Enregistrement...' : isEditing ? 'Mettre à jour' : 'Enregistrer' }}
+            </button>
+          </div>
+        </form>
+
+        <!-- Aperçu mobile (toggle) -->
+        <div v-if="showPreview" class="mobile-preview">
+          <TicketPreviewPanel
+            :preview-data="ticketPreviewData"
+            :is-editing="isEditing"
+            :class="{ 'panel-disabled': isSaving }"
+            @submit="handleSubmit"
           />
-        </label>
-
-        <div class="form-row">
-          <label class="form-field">
-            <span class="field-label">Départ</span>
-            <select
-              v-model="form.depart"
-              class="select-input"
-              :disabled="isSaving"
-              required
-            >
-              <option value="" disabled>Sélectionner</option>
-              <option
-                v-for="gare in destinationTrains"
-                :key="gare.pk"
-                :value="gare.nom"
-              >
-                {{ gare.nom }}
-              </option>
-            </select>
-          </label>
-
-          <label class="form-field">
-            <span class="field-label">Arrivée</span>
-            <select
-              v-model="form.arrivee"
-              class="select-input"
-              :disabled="isSaving"
-              required
-            >
-              <option value="" disabled>Sélectionner</option>
-              <option
-                v-for="gare in garesArriveePossibles"
-                :key="gare.pk"
-                :value="gare.nom"
-              >
-                {{ gare.nom }}
-              </option>
-            </select>
-          </label>
         </div>
-
-        <div class="form-row">
-          <label class="form-field">
-            <span class="field-label">Classe</span>
-            <select
-              v-model="form.classe"
-              class="select-input"
-              :disabled="isSaving"
-              required
-            >
-              <option value="1ere">1ère classe</option>
-              <option value="2eme">2ème classe</option>
-            </select>
-          </label>
-        </div>
-
-        <div class="price-display-block">
-          <span class="price-label">Prix estimé</span>
-          <span class="price-value">{{ displayedPrice }} MGA</span>
-        </div>
-
-
-        <!-- <button 
-          type="submit" 
-          class="submit-btn" 
-          :disabled="isSaving"
-        >
-          {{ isSaving ? 'Enregistrement...' : isEditing ? 'Mettre à jour' : 'Enregistrer le billet' }}
-        </button> -->
-      </form>
-    </section>
-
-    <TicketPreviewPanel
-      :preview-data="ticketPreviewData"
-      :is-editing="isEditing"
-      :class="{ 'panel-disabled': isSaving }"
-      @submit="handleSubmit"
-    />
+      </section>
+    </template>
   </div>
 </template>
 
 <style scoped>
+/* ===== STYLES EXISTANTS CONSERVÉS ===== */
 .order-grid-container {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -555,11 +691,81 @@ input[type="text"]:focus,
   opacity: 0.6;
   pointer-events: none;
 }
-</style>
 
-/* ===== RESPONSIVE TRIP ORDER ===== */
+/* ===== STYLES MOBILE ===== */
+.mobile-order .summary-panel-compact {
+  padding: 14px;
+  border-radius: 8px;
+}
 
-/* Tablette */
+.mobile-order .form-row {
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mobile-order .form-field {
+  gap: 4px;
+}
+
+.mobile-order input[type="text"],
+.mobile-order .select-input {
+  height: 40px;
+  font-size: 0.9rem;
+  border-radius: 6px;
+}
+
+.mobile-order .checkbox-field {
+  padding: 4px 0;
+}
+
+.mobile-order .checkbox-field input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}
+
+.mobile-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.btn-preview {
+  padding: 10px;
+  background: #f1f5f9;
+  border: 1px solid #dce5dd;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #52625e;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-preview:active {
+  background: #e2e8f0;
+  transform: scale(0.97);
+}
+
+.mobile-preview {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #dce5dd;
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
   .order-grid-container {
     grid-template-columns: 1fr;
@@ -576,7 +782,6 @@ input[type="text"]:focus,
   }
 }
 
-/* Mobile */
 @media (max-width: 480px) {
   .order-grid-container {
     gap: 12px;
@@ -625,4 +830,14 @@ input[type="text"]:focus,
     padding: 8px;
     font-size: 0.8rem;
   }
+  
+  .mobile-actions {
+    grid-template-columns: 1fr;
+  }
+  
+  .btn-preview {
+    padding: 8px;
+    font-size: 0.8rem;
+  }
 }
+</style>

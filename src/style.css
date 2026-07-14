@@ -1120,9 +1120,10 @@ input:focus {
 }
 
 .cart-section {
-  margin-top: 32px;
+  /* margin-top: 32px; */
   padding-top: 24px;
-  border-top: 2px solid #dce5dd;
+  /* border-top: 2px solid #dce5dd; */
+  margin-bottom: 15px;
 }
 
 .cart-section h3 {
@@ -1677,3 +1678,214 @@ input:focus {
   }
 }
 
+/* style.css - Ajouts mobiles */
+
+/* ============================================================
+   RESPONSIVE MOBILE - POINTS DE RUPTURE
+   ============================================================ */
+
+/* ===== TABLETTE (max-width: 940px) ===== */
+@media (max-width: 940px) {
+  .container {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  
+  .grid-2 {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .grid-3 {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  
+  .flex-wrap-tablet {
+    flex-wrap: wrap !important;
+  }
+  
+  .text-center-tablet {
+    text-align: center !important;
+  }
+  
+  .hide-tablet {
+    display: none !important;
+  }
+  
+  .show-tablet {
+    display: flex !important;
+  }
+}
+
+/* ===== MOBILE (max-width: 768px) ===== */
+@media (max-width: 768px) {
+  .container {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  
+  .grid-2,
+  .grid-3 {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .flex-wrap-mobile {
+    flex-wrap: wrap !important;
+  }
+  
+  .text-center-mobile {
+    text-align: center !important;
+  }
+  
+  .full-width-mobile {
+    width: 100% !important;
+  }
+  
+  .stack-mobile {
+    flex-direction: column !important;
+  }
+  
+  .hide-mobile {
+    display: none !important;
+  }
+  
+  .show-mobile {
+    display: flex !important;
+  }
+  
+  .mobile-padding-sm {
+    padding: 12px !important;
+  }
+  
+  .mobile-gap-sm {
+    gap: 8px !important;
+  }
+}
+
+/* ===== PETIT MOBILE (max-width: 480px) ===== */
+@media (max-width: 480px) {
+  .container {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  
+  .hide-small-mobile {
+    display: none !important;
+  }
+  
+  .mobile-padding-xs {
+    padding: 8px !important;
+  }
+  
+  .mobile-gap-xs {
+    gap: 4px !important;
+  }
+  
+  .text-xs {
+    font-size: 0.75rem !important;
+  }
+  
+  .text-sm {
+    font-size: 0.85rem !important;
+  }
+  
+  .text-base {
+    font-size: 0.95rem !important;
+  }
+  
+  .text-lg {
+    font-size: 1.1rem !important;
+  }
+  
+  .text-xl {
+    font-size: 1.3rem !important;
+  }
+}
+
+/* ============================================================
+   TOUCH OPTIMIZATIONS
+   ============================================================ */
+@media (hover: none) {
+  /* Supprimer les effets hover sur mobile */
+  .btn-primary:hover,
+  .btn-secondary:hover,
+  .primary-button:hover,
+  .secondary-button:hover,
+  .train-option-compact:hover,
+  .ticket-card:hover {
+    transform: none !important;
+  }
+  
+  /* Augmenter la taille des cibles tactiles */
+  button,
+  .clickable,
+  [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Désactiver les transitions sur mobile pour meilleure performance */
+  * {
+    transition-duration: 0.15s !important;
+  }
+}
+
+/* ============================================================
+   SCROLLBAR STYLING
+   ============================================================ */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f4f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #24746c;
+  border-radius: 4px;
+}
+
+/* ============================================================
+   UTILITAIRES MOBILE
+   ============================================================ */
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.gap-1 { gap: 4px; }
+.gap-2 { gap: 8px; }
+.gap-3 { gap: 12px; }
+.gap-4 { gap: 16px; }
+.gap-5 { gap: 24px; }
+
+.mt-1 { margin-top: 4px; }
+.mt-2 { margin-top: 8px; }
+.mt-3 { margin-top: 12px; }
+.mt-4 { margin-top: 16px; }
+.mt-5 { margin-top: 24px; }
+
+.mb-1 { margin-bottom: 4px; }
+.mb-2 { margin-bottom: 8px; }
+.mb-3 { margin-bottom: 12px; }
+.mb-4 { margin-bottom: 16px; }
+.mb-5 { margin-bottom: 24px; }
+
+/* Safe area pour iPhone */
+@supports (padding: max(0px)) {
+  .safe-area-bottom {
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+  
+  .safe-area-top {
+    padding-top: max(16px, env(safe-area-inset-top));
+  }
+}
