@@ -10,6 +10,58 @@ const trains = ref([])
 const isLoading = ref(false)
 const error = ref('')
 
+// Statistiques de la section "Diatsara en chiffres"
+const statsData = [
+  {
+    id: 1,
+    icon: '🚂',
+    value: '15+',
+    label: 'Trajets quotidiens',
+    description: 'Reliant les principales villes de Madagascar',
+    color: '#24746c'
+  },
+  {
+    id: 2,
+    icon: '👨‍👩‍👧‍👦',
+    value: '100K+',
+    label: 'Voyageurs par mois',
+    description: 'Une communauté grandissante de voyageurs',
+    color: '#2d8f85'
+  },
+  {
+    id: 3,
+    icon: '🌟',
+    value: '98%',
+    label: 'Taux de satisfaction',
+    description: 'Des voyageurs recommandant notre service',
+    color: '#b8860b'
+  },
+  {
+    id: 4,
+    icon: '🏛️',
+    value: '25',
+    label: 'Gares desservies',
+    description: 'À travers les régions de Madagascar',
+    color: '#4a7c59'
+  },
+  {
+    id: 5,
+    icon: '🌍',
+    value: '850+',
+    label: 'Kilomètres de voies',
+    description: 'Un réseau ferroviaire en pleine expansion',
+    color: '#3a6b8f'
+  },
+  {
+    id: 6,
+    icon: '⚡',
+    value: '99.5%',
+    label: 'Ponctualité',
+    description: 'Des départs toujours à l\'heure',
+    color: '#5a7c6c'
+  }
+]
+
 // Vérification de la session
 const checkSession = () => {
   const session = localStorage.getItem('rail_user_session')
@@ -46,8 +98,8 @@ const activeTrain = computed(() => {
   return null
 })
 
-// Statistiques calculées
-const stats = computed(() => ({
+// Statistiques du hero
+const heroStats = computed(() => ({
   trajets: trains.value.length > 0 ? `${trains.value.length}+` : '0',
   satisfaction: '98%',
   gares: '15'
@@ -57,7 +109,6 @@ onMounted(() => {
   checkSession()
   loadActiveTrains()
   
-  // Écouter les changements de session
   window.addEventListener('storage', (e) => {
     if (e.key === 'rail_user_session') {
       checkSession()
@@ -97,7 +148,6 @@ onMounted(() => {
           </div>
           
           <div v-else class="no-trains-message">
-            <span>🚂</span>
             <span>Aucun départ planifié pour le moment</span>
           </div>
 
@@ -140,15 +190,15 @@ onMounted(() => {
         <div class="hero-right">
           <div class="hero-stats">
             <div class="stat-card">
-              <div class="stat-number">{{ stats.trajets }}</div>
+              <div class="stat-number">{{ heroStats.trajets }}</div>
               <div class="stat-label">Trajets quotidiens</div>
             </div>
             <div class="stat-card">
-              <div class="stat-number">{{ stats.satisfaction }}</div>
+              <div class="stat-number">{{ heroStats.satisfaction }}</div>
               <div class="stat-label">Satisfaction client</div>
             </div>
             <div class="stat-card">
-              <div class="stat-number">{{ stats.gares }}</div>
+              <div class="stat-number">{{ heroStats.gares }}</div>
               <div class="stat-label">Gares desservies</div>
             </div>
           </div>
@@ -156,42 +206,28 @@ onMounted(() => {
       </div>
     </header>
 
-    <!-- SECTION DES PRIX -->
-    <section class="price-section">
-      <div class="section-header">
-        <span class="section-badge">Tarifs</span>
-        <h3>Nos Classes de Voyage</h3>
-        <p class="section-subtitle">Choisissez votre confort</p>
-      </div>
-
-      <div class="price-grid">
-        <div class="price-category">
-          <div class="price-icon">🚂</div>
-          <h4>2ème Classe</h4>
-          <div class="price-amount">7 000 MGA</div>
-          <div class="price-detail">Trajet simple</div>
-          <div class="price-amount alt">14 000 MGA</div>
-          <div class="price-detail">Aller-retour</div>
-          <div class="price-features">
-            <span>Sièges standards</span>
-            <span>Espace confortable</span>
-          </div>
+    <!-- SECTION STATS - Diatsara en chiffres (Version blanche) -->
+    <section class="stats-section">
+      <div class="stats-container">
+        <div class="stats-header">
+          <span class="section-badge">📊 Diatsara en chiffres</span>
+          <h2>Notre Impact à Madagascar</h2>
+          <p class="stats-subtitle">
+            Des chiffres qui parlent d'eux-mêmes
+          </p>
         </div>
 
-        <div class="price-category featured">
-          <div class="featured-badge">POPULAIRE</div>
-          <div class="price-icon">🌟</div>
-          <h4>1ère Classe</h4>
-          <div class="price-amount">10 000 MGA</div>
-          <div class="price-detail">Trajet simple</div>
-          <div class="price-amount alt">15 000 MGA</div>
-          <div class="price-detail">Aller-retour</div>
-          <div class="price-amount alt">25 000 MGA</div>
-          <div class="price-detail">Aller-retour premium</div>
-          <div class="price-features">
-            <span>Sièges Premium</span>
-            <span>Service à bord</span>
-            <span>Climatisation</span>
+        <div class="stats-grid">
+          <div 
+            v-for="stat in statsData" 
+            :key="stat.id" 
+            class="stat-card"
+            :style="{ '--stat-color': stat.color }"
+          >
+            <div class="stat-icon">{{ stat.icon }}</div>
+            <div class="stat-value" :style="{ color: stat.color }">{{ stat.value }}</div>
+            <div class="stat-label">{{ stat.label }}</div>
+            <div class="stat-description">{{ stat.description }}</div>
           </div>
         </div>
       </div>
@@ -235,7 +271,7 @@ onMounted(() => {
     sans-serif;
 }
 
-/* HERO SECTION */
+/* ===== HERO SECTION ===== */
 .hero-section {
   position: relative;
   min-height: 80vh;
@@ -271,7 +307,6 @@ onMounted(() => {
   animation: fadeInUp 0.8s ease-out;
 }
 
-/* LEFT COLUMN */
 .hero-left {
   text-align: left;
 }
@@ -323,17 +358,6 @@ onMounted(() => {
   border-color: rgba(36, 116, 108, 0.4);
 }
 
-.trains-count {
-  text-align: center;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.6);
-  letter-spacing: 0.5px;
-}
-
-/* Loading & Error states */
 .loading-trains {
   display: flex;
   align-items: center;
@@ -390,10 +414,6 @@ onMounted(() => {
   font-size: 0.95rem;
 }
 
-.no-trains-message span:first-child {
-  font-size: 1.5rem;
-}
-
 /* Hero Actions */
 .hero-actions {
   display: flex;
@@ -446,7 +466,7 @@ onMounted(() => {
   border-color: rgba(255, 255, 255, 0.4);
 }
 
-/* RIGHT COLUMN - STATS */
+/* Hero Right Stats */
 .hero-right {
   display: flex;
   justify-content: center;
@@ -461,7 +481,7 @@ onMounted(() => {
   max-width: 300px;
 }
 
-.stat-card {
+.hero-stats .stat-card {
   background: rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -471,13 +491,13 @@ onMounted(() => {
   transition: all 0.3s ease;
 }
 
-.stat-card:hover {
+.hero-stats .stat-card:hover {
   background: rgba(255, 255, 255, 0.15);
   transform: translateX(-8px) scale(1.02);
   border-color: rgba(36, 116, 108, 0.4);
 }
 
-.stat-number {
+.hero-stats .stat-number {
   font-size: 2.5rem;
   font-weight: 800;
   background: linear-gradient(135deg, #e0f2f1 0%, #24746c 100%);
@@ -486,26 +506,51 @@ onMounted(() => {
   background-clip: text;
 }
 
-.stat-label {
+.hero-stats .stat-label {
   font-size: 0.85rem;
   color: rgba(255, 255, 255, 0.7);
   margin-top: 5px;
 }
 
-/* PRICE SECTION */
-.price-section {
+/* ===== STATS SECTION - VERSION BLANCHE ===== */
+.stats-section {
   padding: 80px 20px;
-  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+  background: #ffffff;
+  color: #0a1a1a;
+  position: relative;
 }
 
-.section-header {
+/* Bordure décorative en haut */
+.stats-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #24746c, #4a7c59, #b8860b, #2d8f85, #24746c);
+  background-size: 200% 100%;
+  animation: gradientMove 4s ease-in-out infinite;
+}
+
+@keyframes gradientMove {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.stats-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.stats-header {
   text-align: center;
   margin-bottom: 50px;
 }
 
 .section-badge {
   display: inline-block;
-  background: #e0f2f1;
+  background: #eaf6f2;
   color: #24746c;
   padding: 4px 16px;
   border-radius: 50px;
@@ -516,121 +561,80 @@ onMounted(() => {
   margin-bottom: 12px;
 }
 
-.section-header h3 {
+.stats-header h2 {
   font-size: 2.5rem;
-  color: #1a2a2a;
-  font-weight: 700;
+  margin: 0 0 8px 0;
+  font-weight: 800;
+  color: #0a1a1a;
+}
+
+.stats-subtitle {
+  font-size: 1.1rem;
+  color: #667672;
   margin: 0;
 }
 
-.section-subtitle {
-  color: #64748b;
-  font-size: 1.1rem;
-  margin-top: 8px;
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 30px;
 }
 
-.price-grid {
-  display: flex;
-  justify-content: center;
-  gap: 40px;
-  max-width: 900px;
-  margin: 0 auto;
-  flex-wrap: wrap;
-}
-
-.price-category {
-  flex: 1;
-  min-width: 250px;
-  max-width: 350px;
-  background: white;
-  padding: 40px 30px;
-  border-radius: 20px;
+.stats-grid .stat-card {
   text-align: center;
-  box-shadow: 0 4px 25px rgba(0, 0, 0, 0.06);
-  transition: all 0.3s ease;
+  background: #f8faf8;
+  border-radius: 16px;
+  padding: 30px 20px;
   border: 1px solid #eef2f6;
+  transition: all 0.4s ease;
   position: relative;
 }
 
-.price-category:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
+.stats-grid .stat-card:hover {
+  background: #ffffff;
+  transform: translateY(-6px);
+  border-color: var(--stat-color);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
 }
 
-.price-category.featured {
-  border: 2px solid #24746c;
-  background: linear-gradient(135deg, #f8fafc 0%, #eef8f7 100%);
-}
-
-.featured-badge {
-  position: absolute;
-  top: -12px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #24746c;
-  color: white;
-  padding: 4px 20px;
-  border-radius: 50px;
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-.price-icon {
+.stat-icon {
   font-size: 2.5rem;
-  margin-bottom: 15px;
+  margin-bottom: 12px;
+  display: block;
+  transition: transform 0.4s ease;
 }
 
-.price-category h4 {
-  font-size: 1.3rem;
-  color: #1a2a2a;
-  margin-bottom: 15px;
+.stats-grid .stat-card:hover .stat-icon {
+  transform: scale(1.15) rotate(-5deg);
 }
 
-.price-amount {
-  font-size: 1.8rem;
+.stat-value {
+  font-size: 2.8rem;
   font-weight: 800;
-  color: #24746c;
-  margin: 10px 0 4px;
+  margin-bottom: 4px;
+  transition: color 0.3s ease;
 }
 
-.price-amount.alt {
-  font-size: 1.4rem;
-  margin-top: 5px;
-}
-
-.price-detail {
-  font-size: 0.85rem;
-  color: #64748b;
-  margin-bottom: 5px;
-}
-
-.price-features {
-  margin-top: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.price-features span {
-  font-size: 0.9rem;
-  color: #475569;
-  padding: 4px 0;
-}
-
-.price-features span::before {
-  content: "✓ ";
-  color: #24746c;
+.stat-label {
+  font-size: 1rem;
   font-weight: 700;
+  color: #0a1a1a;
+  margin-bottom: 6px;
 }
 
-/* FOOTER */
+.stat-description {
+  font-size: 0.85rem;
+  color: #667672;
+  line-height: 1.5;
+}
+
+/* ===== FOOTER ===== */
 footer {
   background: #0a1a1a;
   color: white;
   padding: 40px 20px;
   margin-top: auto;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .footer-content {
@@ -671,7 +675,7 @@ footer {
 }
 
 .footer-links a:hover {
-  color: #e0f2f1;
+  color: #7ee0d7;
 }
 
 .footer-copy {
@@ -683,7 +687,7 @@ footer {
   text-align: center;
 }
 
-/* ANIMATIONS */
+/* ===== ANIMATIONS ===== */
 @keyframes fadeInUp {
   from {
     opacity: 0;
@@ -695,7 +699,7 @@ footer {
   }
 }
 
-/* RESPONSIVE */
+/* ===== RESPONSIVE ===== */
 @media (max-width: 1024px) {
   .hero-content {
     grid-template-columns: 1fr;
@@ -722,144 +726,24 @@ footer {
     max-width: 100%;
   }
 
-  .stat-card:hover {
-    transform: translateY(-8px) scale(1.02);
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
   }
 }
 
-@media (max-width: 768px) {
-  .hero-left h1 {
-    font-size: 2.8rem;
-  }
-
-  .hero-subtitle {
-    font-size: 1rem;
-  }
-
-  .trains-summary-wrapper {
-    padding: 12px 16px;
-  }
-
-  .hero-actions {
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .btn-primary,
-  .btn-secondary {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .hero-stats {
-    grid-template-columns: 1fr;
-  }
-
-  .stat-card {
-    padding: 20px;
-  }
-
-  .stat-number {
-    font-size: 2rem;
-  }
-
-  .price-grid {
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .price-category {
-    max-width: 100%;
-    width: 100%;
-  }
-
-  .section-header h3 {
-    font-size: 2rem;
-  }
-
-  .footer-links {
-    flex-direction: column;
-    align-items: center;
-    gap: 15px;
-  }
-
-  .loading-trains,
-  .error-trains,
-  .no-trains-message {
-    padding: 12px 16px;
-    font-size: 0.85rem;
-  }
-}
-</style>
-
-<style scoped>
-/* ===== RESPONSIVE HOME ===== */
-
-/* Tablette */
-@media (max-width: 1024px) {
-  .hero-content {
-    grid-template-columns: 1fr;
-    gap: 40px;
-    text-align: center;
-  }
-
-  .hero-left {
-    text-align: center;
-  }
-
-  .hero-actions {
-    justify-content: center;
-  }
-
-  .train-info-bar {
-    justify-content: center;
-  }
-
-  .hero-right {
-    order: -1;
-  }
-
-  .hero-stats {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 15px;
-    max-width: 100%;
-  }
-
-  .stat-card:hover {
-    transform: translateY(-8px) scale(1.02);
-  }
-  
-  .hero-left h1 {
-    font-size: 3.5rem;
-  }
-}
-
-/* Mobile */
 @media (max-width: 768px) {
   .hero-section {
     min-height: 100vh;
     padding: 20px;
   }
-  
+
   .hero-left h1 {
     font-size: 2.8rem;
   }
 
   .hero-subtitle {
     font-size: 1rem;
-  }
-
-  .train-info-bar {
-    flex-direction: column;
-    gap: 12px;
-    padding: 15px 20px;
-    width: 100%;
-  }
-
-  .info-divider {
-    width: 80%;
-    height: 1px;
   }
 
   .hero-actions {
@@ -879,26 +763,33 @@ footer {
     gap: 12px;
   }
 
-  .stat-card {
+  .hero-stats .stat-card {
     padding: 16px 20px;
   }
 
-  .stat-number {
+  .hero-stats .stat-number {
     font-size: 2rem;
   }
 
-  .price-grid {
-    flex-direction: column;
-    align-items: center;
+  .stats-section {
+    padding: 50px 16px;
   }
 
-  .price-category {
-    max-width: 100%;
-    width: 100%;
+  .stats-header h2 {
+    font-size: 1.8rem;
   }
 
-  .section-header h3 {
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .stats-grid .stat-value {
     font-size: 2rem;
+  }
+
+  .stats-grid .stat-card {
+    padding: 20px 16px;
   }
 
   .footer-links {
@@ -913,43 +804,52 @@ footer {
     padding: 12px 16px;
     font-size: 0.85rem;
   }
-  
+
   .trains-summary-wrapper {
     padding: 12px 16px;
   }
 }
 
-/* Petit mobile */
 @media (max-width: 480px) {
   .hero-left h1 {
     font-size: 2.2rem;
   }
-  
+
   .hero-badge {
     font-size: 0.65rem;
     padding: 4px 14px;
   }
-  
+
   .hero-subtitle {
     font-size: 0.9rem;
   }
-  
-  .price-section {
-    padding: 40px 16px;
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+    max-width: 400px;
+    margin: 0 auto;
   }
-  
-  .price-category {
-    padding: 24px 16px;
-  }
-  
-  .price-amount {
+
+  .stats-header h2 {
     font-size: 1.5rem;
   }
-  
-  .footer {
+
+  .stats-section {
+    padding: 40px 16px;
+  }
+
+  .stats-grid .stat-card {
     padding: 24px 16px;
   }
-  
+
+  .stat-value {
+    font-size: 2.2rem;
+  }
+
+  footer {
+    padding: 24px 16px;
+  }
+
   .footer-info h4 {
     font-size: 1.2rem;
   }
