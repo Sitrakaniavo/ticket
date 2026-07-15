@@ -371,7 +371,7 @@ onMounted(() => {
         v-else-if="!isLoadingTrains && trains.length === 0 && !showCartPage"
         class="empty-state"
       >
-        <div class="empty-state-icon">🚂</div>
+        <div class="empty-state-icon"></div>
         <h2>Aucun départ planifié</h2>
         <p>
           Aucun train actif n'est disponible pour le moment.<br />

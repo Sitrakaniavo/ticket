@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, reactive, watch, onMounted } from 'vue'
 import QrcodeVue from 'qrcode.vue'
-import { supabaseClient } from '../lib/supabaseClient'
+import { supabaseClient, supabaseMadarail } from '../lib/supabaseClient'
 
 const props = defineProps({
   cartItems: { type: Array, required: true, default: () => [] },
@@ -37,8 +37,7 @@ const editForm = reactive({
   montant: 0,
   num_ticket: '',
   id_voyage: null,
-  date_voyage: '',
-  heure_depart: ''
+  date_voyage: ''
 })
 
 // ===== FONCTIONS DE FORMATAGE =====
@@ -71,9 +70,9 @@ async function getVoyageById(voyageId) {
   }
   
   try {
-    const { data, error } = await supabaseClient
+    const { data, error } = await supabaseMadarail
       .from('voyages')
-      .select('id, date_voyage, heure_depart, sens, nom, statut')
+      .select('id, date_voyage, sens, statut')
       .eq('id', voyageId)
       .maybeSingle()
 
@@ -105,9 +104,9 @@ async function loadMissingVoyages(tickets) {
   isLoadingVoyages.value = true
   
   try {
-    const { data, error } = await supabaseClient
+    const { data, error } = await supabaseMadarail
       .from('voyages')
-      .select('id, date_voyage, heure_depart, sens, nom, statut')
+      .select('id, date_voyage, sens, statut')
       .in('id', voyageIds)
 
     if (error) throw error
@@ -133,7 +132,6 @@ const enrichedTickets = computed(() => {
       return {
         ...ticket,
         date_voyage: ticket.date_voyage,
-        heure_depart: ticket.heure_depart || null,
         voyage_trouve: true,
         voyage_statut: 'unknown'
       }
@@ -144,7 +142,6 @@ const enrichedTickets = computed(() => {
       return {
         ...ticket,
         date_voyage: voyage.date_voyage || null,
-        heure_depart: voyage.heure_depart || null,
         voyage_trouve: true,
         voyage_statut: voyage.statut || 'unknown'
       }
@@ -153,7 +150,6 @@ const enrichedTickets = computed(() => {
     return {
       ...ticket,
       date_voyage: null,
-      heure_depart: null,
       voyage_trouve: false,
       voyage_statut: null
     }
@@ -279,7 +275,6 @@ async function openEditModal(item) {
   editForm.num_ticket = item.num_ticket || ''
   editForm.id_voyage = item.id_voyage || null
   editForm.date_voyage = item.date_voyage || (voyage ? voyage.date_voyage : '')
-  editForm.heure_depart = item.heure_depart || (voyage ? voyage.heure_depart : '')
   
   editError.value = ''
   editSuccess.value = false
@@ -473,7 +468,7 @@ onMounted(() => {
     <!-- Header avec filtres -->
     <div class="cart-header-actions">
       <div class="filter-bar">
-        <span class="filter-label">Filtrer :</span>
+        <span class="filter-label">Filtrer</span>
         <div class="filter-options">
           <button 
             v-for="f in ['all', 'actif', 'inactif']" 
@@ -489,14 +484,14 @@ onMounted(() => {
       </div>
       
       <button class="btn-refresh-cart" @click="refreshData" title="Rafraîchir">
-        <span v-if="!isMobile">🔄 Rafraîchir</span>
-        <span v-else>🔄</span>
+        <span v-if="!isMobile">↻ Rafraîchir</span>
+        <span v-else>↻</span>
       </button>
     </div>
 
     <!-- Notice -->
     <div class="notice-bar" :class="{ 'mobile-notice': isMobile }">
-      <span>💡</span>
+      <span class="notice-icon">i</span>
       <span>Pour valider les billets, présentez-vous au vendeur.</span>
     </div>
 
@@ -505,17 +500,16 @@ onMounted(() => {
       <div class="empty-tickets-icon">🎫</div>
       <h3 class="empty-tickets-title">Aucun billet enregistré</h3>
       <p class="empty-tickets-text">
-        Vous n'avez pas encore de billets dans votre historique.<br />
+        Vous n'avez pas encore de billets dans votre historique.
         Réservez votre premier voyage dès maintenant !
       </p>
-
     </div>
 
     <!-- GRILLE DES BILLETS -->
     <template v-else>
       <div class="cart-grid-layout" :class="{ 'mobile-grid': isMobile }">
         <div v-for="item in filteredItems" :key="item.id" 
-          class="ticket-card" :class="[`status-${item.status}`, { 'mobile-ticket': isMobile }]"
+          class="ticket-card" :class="[`status-${item.status}`]"
           @click="openModal(item)">
           
           <div class="ticket-header">
@@ -524,81 +518,68 @@ onMounted(() => {
           </div>
 
           <div class="ticket-body">
+            <!-- Trajet -->
             <div class="route-display">
               <div class="station">
-                <span>Départ</span>
-                <strong>{{ item.depart || '---' }}</strong>
+                <span class="station-label">Départ</span>
+                <strong class="station-name">{{ item.depart || '---' }}</strong>
               </div>
               <div class="route-arrow">→</div>
               <div class="station">
-                <span>Arrivée</span>
-                <strong>{{ item.arrivee || '---' }}</strong>
+                <span class="station-label">Arrivée</span>
+                <strong class="station-name">{{ item.arrivee || '---' }}</strong>
               </div>
             </div>
             
+            <!-- Informations : Date et Classe en space-between -->
             <div class="ticket-meta">
               <div class="meta-item" :class="{ 'meta-missing': !item.voyage_trouve }">
-                <span class="meta-icon">📅</span>
                 <span class="meta-label">Date</span>
                 <span class="meta-value" :class="{ 'date-missing': !item.date_voyage }">
                   {{ formatDate(item.date_voyage) }}
                 </span>
-                <span v-if="!item.voyage_trouve" class="meta-warning">⚠️</span>
-              </div>
-              <div class="meta-item" :class="{ 'meta-missing': !item.voyage_trouve }">
-                <span class="meta-icon">⏰</span>
-                <span class="meta-label">Heure</span>
-                <span class="meta-value" :class="{ 'date-missing': !item.heure_depart }">
-                  {{ item.heure_depart || '---' }}
-                </span>
+                <span v-if="!item.voyage_trouve" class="meta-warning">⚠</span>
               </div>
               <div class="meta-item">
-                <span class="meta-icon">🎫</span>
                 <span class="meta-label">Classe</span>
                 <span class="meta-value" :class="{ 'first-class': item.classe === '1ere' }">
                   {{ getClasseDisplay(item.classe) }}
                 </span>
               </div>
-              <div class="meta-item" v-if="item.voyage_statut">
-                <span class="meta-icon">📌</span>
-                <span class="meta-label">Statut</span>
-                <span class="meta-value" :class="{ 
-                  'statut-actif': item.voyage_statut === 'actif',
-                  'statut-termine': item.voyage_statut === 'termine'
-                }">
-                  {{ item.voyage_statut }}
-                </span>
-              </div>
+
             </div>
             
+            <!-- Voyageur -->
             <div class="meta-row">
-              <span>Voyageur :</span>
-              <strong>{{ item.nom_voyageur || '---' }}</strong>
+              <span class="meta-row-label">Voyageur</span>
+              <strong class="meta-row-value">{{ item.nom_voyageur || '---' }}</strong>
             </div>
             
+            <!-- Avertissement voyage non trouvé -->
             <div v-if="!item.voyage_trouve && item.id_voyage" class="voyage-warning">
-              ⚠️ Voyage non trouvé (ID: {{ item.id_voyage.substring(0, 8) }}...)
+              ⚠ Voyage non trouvé (ID: {{ item.id_voyage.substring(0, 8) }}...)
             </div>
           </div>
 
-          <div class="ticket-footer" :class="{ 'mobile-footer': isMobile }">
+          <!-- Footer du ticket -->
+          <div class="ticket-footer">
             <span class="price">{{ formatPrice(item.montant) }} MGA</span>
             <div class="actions-zone">
               <button v-if="item.status === 'actif'" @click.stop="openEditModal(item)" class="card-action-btn edit-btn">
-                ✎
+                Modifier
               </button>
               <button v-if="item.status === 'actif'" @click.stop="handleRemove(item.id)" class="card-action-btn remove-btn">
-                ✕
+                Annuler
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Total - Afficher uniquement si des billets actifs existent -->
+      <!-- Total -->
       <div v-if="hasActiveTickets" class="cart-summary-footer" :class="{ 'mobile-summary': isMobile }">
         <div class="total-block">
-          <span class="total-label">Total ({{ activeTicketsCount }} billet{{ activeTicketsCount > 1 ? 's' : '' }}) :</span>
+          <span class="total-label">Total ({{ activeTicketsCount }} billet{{ activeTicketsCount > 1 ? 's' : '' }})</span>
           <span class="total-value">{{ formatPrice(totalActiveAmount) }} MGA</span>
         </div>
       </div>
@@ -613,25 +594,15 @@ onMounted(() => {
           <qrcode-vue :value="selectedTicket?.num_ticket || ''" :size="isMobile ? 140 : 160" level="H" render-as="svg" />
         </div>
         <div class="ticket-info">
-          <p><strong>Numéro :</strong> {{ selectedTicket?.num_ticket }}</p>
-          <p><strong>Voyageur :</strong> {{ selectedTicket?.nom_voyageur }}</p>
-          <p><strong>Trajet :</strong> {{ selectedTicket?.depart || '---' }} → {{ selectedTicket?.arrivee || '---' }}</p>
-          <p><strong>Date :</strong> {{ formatDate(selectedTicket?.date_voyage) }}</p>
-          <p><strong>Heure :</strong> {{ selectedTicket?.heure_depart || '---' }}</p>
-          <p><strong>Classe :</strong> {{ getClasseDisplay(selectedTicket?.classe) }}</p>
-          <p><strong>Montant :</strong> {{ formatPrice(selectedTicket?.montant) }} MGA</p>
-          <p v-if="selectedTicket?.voyage_statut">
-            <strong>Statut voyage :</strong> 
-            <span :class="{ 
-              'statut-actif': selectedTicket?.voyage_statut === 'actif',
-              'statut-termine': selectedTicket?.voyage_statut === 'termine'
-            }">
-              {{ selectedTicket?.voyage_statut }}
-            </span>
-          </p>
-          <p v-if="selectedTicket?.mineur" class="minor-badge">🧒 Voyageur mineur</p>
+          <p v-if="selectedTicket?.mineur" class="minor-badge">Voyageur mineur</p>
+          <p><span class="info-label">Numéro</span> <span class="info-value">{{ selectedTicket?.num_ticket }}</span></p>
+          <p><span class="info-label">Voyageur</span> <span class="info-value">{{ selectedTicket?.nom_voyageur }}</span></p>
+          <p><span class="info-label">Trajet</span> <span class="info-value">{{ selectedTicket?.depart || '---' }} → {{ selectedTicket?.arrivee || '---' }}</span></p>
+          <p><span class="info-label">Date</span> <span class="info-value">{{ formatDate(selectedTicket?.date_voyage) }}</span></p>
+          <p><span class="info-label">Classe</span> <span class="info-value">{{ getClasseDisplay(selectedTicket?.classe) }}</span></p>
+          <p><span class="info-label">Montant</span> <span class="info-value">{{ formatPrice(selectedTicket?.montant) }} MGA</span></p>
           <p v-if="selectedTicket?.id_voyage && !selectedTicket?.voyage_trouve" class="warning-badge">
-            ⚠️ Voyage associé non trouvé (ID: {{ selectedTicket?.id_voyage?.substring(0, 8) }}...)
+            ⚠ Voyage associé non trouvé (ID: {{ selectedTicket?.id_voyage?.substring(0, 8) }}...)
           </p>
         </div>
       </div>
@@ -641,11 +612,11 @@ onMounted(() => {
     <div v-if="isEditModalOpen" class="modal-overlay" @click.self="closeEditModal">
       <div class="modal-content edit-modal" :class="{ 'mobile-modal': isMobile }">
         <button class="close-btn" @click="closeEditModal" :disabled="isSaving">×</button>
-        <h3>✎ Modifier le billet</h3>
+        <h3>Modifier le billet</h3>
         <p class="edit-subtitle">Modifiez les informations du billet {{ editForm.num_ticket }}</p>
 
         <div v-if="editSuccess" class="edit-success">
-          ✅ Billet modifié avec succès !
+          ✓ Billet modifié avec succès !
         </div>
 
         <div class="edit-form">
@@ -713,7 +684,7 @@ onMounted(() => {
           </div>
 
           <div v-if="editError" class="edit-error">
-            ⚠️ {{ editError }}
+            ⚠ {{ editError }}
           </div>
 
           <div class="edit-actions">
@@ -731,7 +702,7 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* ===== STYLES EXISTANTS ===== */
+/* ===== STYLES COMMUNS ===== */
 .cart-panel-container {
   display: flex;
   flex-direction: column;
@@ -831,8 +802,17 @@ onMounted(() => {
   line-height: 1.5;
 }
 
-.notice-bar span:first-child {
-  font-size: 1.2rem;
+.notice-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: #0f172a;
+  color: #ffffff;
+  border-radius: 50%;
+  font-size: 0.7rem;
+  font-weight: 700;
   flex-shrink: 0;
 }
 
@@ -851,9 +831,9 @@ onMounted(() => {
 }
 
 .empty-tickets-icon {
-  font-size: 4rem;
+  font-size: 3.5rem;
   margin-bottom: 16px;
-  opacity: 0.6;
+  opacity: 0.5;
 }
 
 .empty-tickets-title {
@@ -866,37 +846,15 @@ onMounted(() => {
 .empty-tickets-text {
   font-size: 0.95rem;
   color: #667672;
-  margin: 0 0 24px 0;
+  margin: 0;
   line-height: 1.6;
   max-width: 400px;
-}
-
-.btn-book-now {
-  padding: 12px 32px;
-  background: #24746c;
-  color: #ffffff;
-  border: none;
-  border-radius: 8px;
-  font-weight: 700;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.btn-book-now:hover {
-  background: #1b5e58;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(36, 116, 108, 0.3);
-}
-
-.btn-book-now:active {
-  transform: scale(0.97);
 }
 
 /* ===== GRILLE DES BILLETS ===== */
 .cart-grid-layout {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 16px;
   max-height: 580px;
   overflow-y: auto;
@@ -905,19 +863,19 @@ onMounted(() => {
 
 .ticket-card {
   background: #ffffff;
-  border: 1px solid #dce5dd;
-  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
   display: flex;
   flex-direction: column;
   position: relative;
-  box-shadow: 0 2px 6px rgba(23, 33, 31, 0.03);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   transition: transform 0.15s, box-shadow 0.15s;
   cursor: pointer;
 }
 
 .ticket-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(23, 33, 31, 0.06);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
 }
 
 .ticket-card:active {
@@ -930,29 +888,32 @@ onMounted(() => {
   opacity: 0.85;
 }
 
+/* ===== HEADER DU TICKET ===== */
 .ticket-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 14px;
-  background: #fdfdfd;
-  border-bottom: 1px solid #f0f4f1;
-  border-radius: 8px 8px 0 0;
+  padding: 10px 16px;
+  background: #f8fafc;
+  border-bottom: 1px solid #eef2f6;
+  border-radius: 10px 10px 0 0;
 }
 
 .ticket-id {
   font-family: monospace;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   font-weight: 700;
   color: #17211f;
+  letter-spacing: 0.5px;
 }
 
 .ticket-status-badge {
   font-size: 0.6rem;
   font-weight: 700;
-  padding: 2px 6px;
+  padding: 2px 10px;
   border-radius: 4px;
   text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
 .ticket-status-badge.actif {
@@ -965,37 +926,42 @@ onMounted(() => {
   color: #777777;
 }
 
+/* ===== CORPS DU TICKET ===== */
 .ticket-body {
-  padding: 14px;
+  padding: 14px 16px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   flex-grow: 1;
 }
 
+/* Trajet */
 .route-display {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  padding: 8px 0;
 }
 
 .station {
   display: flex;
   flex-direction: column;
-  max-width: 42%;
+  flex: 1;
 }
 
-.station span {
-  font-size: 0.68rem;
+.station-label {
+  font-size: 0.6rem;
   color: #889894;
   text-transform: uppercase;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.5px;
+  font-weight: 600;
 }
 
-.station strong {
+.station-name {
   font-size: 0.95rem;
   color: #17211f;
+  font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1004,48 +970,43 @@ onMounted(() => {
 .route-arrow {
   color: #24746c;
   font-size: 0.9rem;
-  font-weight: bold;
+  font-weight: 700;
+  flex-shrink: 0;
+  padding: 0 4px;
 }
 
 .status-inactif .route-arrow {
   color: #889894;
 }
 
-/* ===== META INFOS ===== */
+/* Métadonnées */
 .ticket-meta {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1fr;
-  gap: 4px;
-  background: #f8faf8;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  background: #f8fafc;
   border-radius: 6px;
-  padding: 8px 10px;
+  padding: 8px 12px;
 }
 
 .meta-item {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  font-size: 0.7rem;
-  text-align: center;
-}
-
-.meta-icon {
-  font-size: 0.85rem;
+  gap: 1px;
 }
 
 .meta-label {
+  font-size: 0.58rem;
   color: #889894;
-  font-weight: 500;
-  font-size: 0.6rem;
   text-transform: uppercase;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.3px;
+  font-weight: 600;
 }
 
 .meta-value {
+  font-size: 0.75rem;
   font-weight: 600;
   color: #17211f;
-  font-size: 0.75rem;
 }
 
 .meta-value.first-class {
@@ -1061,7 +1022,7 @@ onMounted(() => {
 }
 
 .meta-missing {
-  opacity: 0.8;
+  opacity: 0.7;
 }
 
 .date-missing {
@@ -1070,23 +1031,31 @@ onMounted(() => {
 }
 
 .meta-warning {
-  font-size: 0.8rem;
+  font-size: 0.7rem;
   color: #f59e0b;
-  margin-left: 2px;
+  margin-left: 4px;
 }
 
+/* Voyageur - space-between */
 .meta-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.78rem;
+  padding: 4px 0;
+  border-top: 1px solid #f1f4f6;
+  padding-top: 8px;
 }
 
-.meta-row span {
-  color: #667672;
+.meta-row-label {
+  font-size: 0.7rem;
+  color: #889894;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
-.meta-row strong {
+.meta-row-value {
+  font-size: 0.85rem;
   color: #17211f;
   font-weight: 600;
   max-width: 160px;
@@ -1096,13 +1065,12 @@ onMounted(() => {
 }
 
 .voyage-warning {
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   color: #f59e0b;
   background: #fffbeb;
   border: 1px solid #fcd34d;
   border-radius: 4px;
   padding: 4px 8px;
-  margin-top: 4px;
   text-align: center;
 }
 
@@ -1111,10 +1079,10 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 14px;
-  background: #fbfdfb;
-  border-top: 1px solid #f0f4f1;
-  border-radius: 0 0 8px 8px;
+  padding: 10px 16px;
+  background: #f8fafc;
+  border-top: 1px solid #eef2f6;
+  border-radius: 0 0 10px 10px;
 }
 
 .price {
@@ -1129,19 +1097,19 @@ onMounted(() => {
 }
 
 .card-action-btn {
-  background: #ffffff;
-  border: 1px solid #dce5dd;
-  padding: 4px 8px;
+  padding: 4px 12px;
   border-radius: 6px;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.12s;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
   -webkit-tap-highlight-color: transparent;
 }
 
 .card-action-btn:active {
-  transform: scale(0.92);
+  transform: scale(0.95);
 }
 
 .edit-btn {
@@ -1165,7 +1133,7 @@ onMounted(() => {
 /* ===== TOTAL ===== */
 .cart-summary-footer {
   background: #ffffff;
-  border: 1px solid #dce5dd;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
   padding: 12px 16px;
 }
@@ -1227,7 +1195,7 @@ onMounted(() => {
 }
 
 .modal-content:not(.edit-modal) {
-  width: 350px;
+  width: 380px;
 }
 
 .close-btn {
@@ -1252,8 +1220,9 @@ onMounted(() => {
 }
 
 .qr-container {
-  margin: 20px 0;
-  padding: 15px;
+  justify-content: center;
+  margin: 16px 0;
+  padding: 12px;
   border: 1px dashed #24746c;
   display: inline-block;
   border-radius: 8px;
@@ -1265,34 +1234,52 @@ onMounted(() => {
 }
 
 .ticket-info p {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin: 6px 0;
+  padding: 4px 0;
+  border-bottom: 1px solid #f1f4f6;
+}
+
+.ticket-info p:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  color: #667672;
+  font-weight: 500;
+  font-size: 0.8rem;
+}
+
+.info-value {
   color: #17211f;
+  font-weight: 600;
+  text-align: right;
 }
 
 .ticket-info .minor-badge {
   color: #f08c00;
   background: #fff9db;
-  padding: 4px 12px;
+  padding: 2px 12px;
   border-radius: 4px;
-  display: inline-block;
   font-weight: 700;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
 }
 
-.warning-badge {
+.ticket-info .warning-badge {
   color: #f59e0b;
   background: #fffbeb;
   padding: 4px 12px;
   border-radius: 4px;
-  display: inline-block;
   font-weight: 600;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   border: 1px solid #fcd34d;
 }
 
 /* ===== MODALE ÉDITION ===== */
 .edit-modal {
-  width: 520px;
+  width: 540px;
   max-width: 100%;
 }
 
@@ -1329,7 +1316,6 @@ onMounted(() => {
   font-size: 0.8rem;
   font-weight: 700;
   color: #52625e;
-  margin-top: 0;
 }
 
 .field-hint {
@@ -1374,7 +1360,6 @@ onMounted(() => {
 .checkbox-group {
   flex-direction: row;
   align-items: center;
-  gap: 8px;
 }
 
 .checkbox-label {
@@ -1392,11 +1377,6 @@ onMounted(() => {
   height: 18px;
   accent-color: #24746c;
   cursor: pointer;
-}
-
-.checkbox-label input[type="checkbox"]:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
 }
 
 .price-display {
@@ -1520,68 +1500,82 @@ onMounted(() => {
   grid-template-columns: 1fr;
   max-height: none;
   padding: 0;
+  gap: 12px;
 }
 
-.mobile-ticket {
-  border-radius: 8px;
+.mobile-grid .ticket-card {
+  border-radius: 10px;
 }
 
-.mobile-ticket .ticket-header {
-  padding: 8px 12px;
+.mobile-grid .ticket-header {
+  padding: 10px 14px;
 }
 
-.mobile-ticket .ticket-id {
-  font-size: 0.75rem;
+.mobile-grid .ticket-id {
+  font-size: 0.78rem;
 }
 
-.mobile-ticket .ticket-body {
-  padding: 10px 12px;
+.mobile-grid .ticket-body {
+  padding: 12px 14px;
+  gap: 8px;
+}
+
+.mobile-grid .station-name {
+  font-size: 0.88rem;
+}
+
+.mobile-grid .station-label {
+  font-size: 0.55rem;
+}
+
+.mobile-grid .route-arrow {
+  font-size: 0.8rem;
+}
+
+.mobile-grid .ticket-meta {
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 6px;
+  padding: 6px 10px;
 }
 
-.mobile-ticket .station strong {
-  font-size: 0.82rem;
+.mobile-grid .meta-value {
+  font-size: 0.7rem;
 }
 
-.mobile-ticket .route-arrow {
-  font-size: 0.75rem;
+.mobile-grid .meta-label {
+  font-size: 0.55rem;
 }
 
-.mobile-ticket .ticket-meta {
-  grid-template-columns: 1fr 1fr;
-  gap: 4px;
-  padding: 6px 8px;
+.mobile-grid .meta-row {
+  padding-top: 6px;
 }
 
-.mobile-ticket .meta-item {
-  font-size: 0.65rem;
-}
-
-.mobile-ticket .meta-row {
-  font-size: 0.72rem;
-}
-
-.mobile-ticket .meta-row strong {
+.mobile-grid .meta-row-value {
+  font-size: 0.8rem;
   max-width: 120px;
 }
 
-.mobile-footer {
-  padding: 8px 12px;
+.mobile-grid .ticket-footer {
+  padding: 8px 14px;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-.mobile-footer .price {
+.mobile-grid .price {
   font-size: 0.95rem;
 }
 
-.mobile-footer .card-action-btn {
-  padding: 6px 10px;
-  font-size: 0.8rem;
+.mobile-grid .card-action-btn {
+  padding: 4px 10px;
+  font-size: 0.65rem;
+}
+
+.mobile-grid .actions-zone {
+  gap: 4px;
 }
 
 .mobile-summary {
-  padding: 10px 12px;
+  padding: 10px 14px;
 }
 
 .mobile-summary .total-value {
@@ -1631,11 +1625,6 @@ onMounted(() => {
   .empty-tickets-text {
     font-size: 0.85rem;
   }
-  
-  .btn-book-now {
-    padding: 10px 24px;
-    font-size: 0.9rem;
-  }
 }
 
 @media (max-width: 480px) {
@@ -1648,22 +1637,22 @@ onMounted(() => {
     padding: 3px 10px;
   }
   
-  .mobile-ticket .ticket-footer {
+  .mobile-grid .ticket-meta {
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  .mobile-grid .ticket-footer {
     flex-direction: column;
     gap: 6px;
     align-items: stretch;
   }
   
-  .mobile-ticket .actions-zone {
+  .mobile-grid .actions-zone {
     justify-content: center;
   }
   
-  .mobile-ticket .station strong {
-    font-size: 0.75rem;
-  }
-  
-  .mobile-ticket .ticket-meta {
-    grid-template-columns: 1fr;
+  .mobile-grid .station-name {
+    font-size: 0.78rem;
   }
   
   .modal-content {
@@ -1696,9 +1685,14 @@ onMounted(() => {
     font-size: 0.8rem;
   }
   
-  .btn-book-now {
-    padding: 8px 20px;
-    font-size: 0.8rem;
+  .ticket-info p {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+  
+  .info-value {
+    text-align: left;
     width: 100%;
   }
 }
