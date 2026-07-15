@@ -1,4 +1,6 @@
 <script setup>
+import { ref, watch, onMounted } from 'vue'
+
 // Définition des props reçues par le composant
 const props = defineProps({
   selectedTrain: {
@@ -16,50 +18,77 @@ const props = defineProps({
 // Émission d'un événement quand un train est sélectionné
 const emit = defineEmits(['select'])
 
+// État local pour la sélection (synchronisé avec la prop)
+const localSelectedTrain = ref(props.selectedTrain)
+
 // Fonction de sélection
 const selectTrain = (trainId) => {
-  console.log('Train sélectionné:', trainId)
+  localSelectedTrain.value = trainId
   emit('select', trainId)
 }
+
+// Synchroniser avec la prop si elle change depuis l'extérieur
+watch(() => props.selectedTrain, (newVal) => {
+  if (newVal !== localSelectedTrain.value) {
+    localSelectedTrain.value = newVal
+  }
+})
+
+// À l'initialisation, sélectionner le premier train si aucun n'est sélectionné
+onMounted(() => {
+  if (!localSelectedTrain.value && props.trains.length > 0) {
+    const firstTrainId = props.trains[0].id
+    localSelectedTrain.value = firstTrainId
+    emit('select', firstTrainId)
+  }
+})
+
+// Surveiller les changements de la liste des trains
+watch(() => props.trains, (newTrains) => {
+  if (newTrains.length > 0) {
+    const exists = newTrains.some(t => t.id === localSelectedTrain.value)
+    if (!exists) {
+      const firstTrainId = newTrains[0].id
+      localSelectedTrain.value = firstTrainId
+      emit('select', firstTrainId)
+    }
+  }
+}, { immediate: true })
 </script>
 
 <template>
   <section class="train-list-compact">
     <div class="section-heading-compact">
-      <h2>🚂 Trains disponibles</h2>
+      <h2>Trains disponibles</h2>
       <span class="train-count">{{ trains.length }} train(s)</span>
     </div>
 
     <div v-if="trains.length === 0" class="no-trains-message">
-      <span>🚫</span>
+      <span class="no-trains-icon">🚫</span>
       <span>Aucun train disponible</span>
     </div>
 
     <div v-else class="options-container">
-      <!-- Boucle sur la liste des trains disponibles -->
       <button
         v-for="train in trains"
         :key="train.id"
         class="train-option-compact"
-        :class="{ selected: selectedTrain === train.id }"
+        :class="{ selected: localSelectedTrain === train.id }"
         type="button"
         @click="selectTrain(train.id)"
       >
         <span class="train-info">
           <strong class="route">
-            <span class="route-icon">🚂</span>
-            {{ train.sens == 2132 ? 'Tamatave ➔ Moramanga' : 'Moramanga ➔ Tamatave' }}
+            {{ train.sens == 2132 ? 'Tamatave → Moramanga' : 'Moramanga → Tamatave' }}
           </strong>
           <span class="date">
-            <span class="date-icon">📅</span>
             {{ train.date_voyage }}
           </span>
           <span v-if="train.heure_depart" class="time">
-            <span class="time-icon">⏰</span>
             {{ train.heure_depart }}
           </span>
         </span>
-        <span v-if="selectedTrain === train.id" class="selected-badge">
+        <span v-if="localSelectedTrain === train.id" class="selected-badge">
           ✓
         </span>
       </button>
@@ -68,15 +97,13 @@ const selectTrain = (trainId) => {
 </template>
 
 <style scoped>
-/* Conteneur principal */
 .train-list-compact {
   background: #ffffff;
-  border: 1px solid #dce5dd;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 16px;
 }
 
-/* En-tête */
 .section-heading-compact {
   display: flex;
   justify-content: space-between;
@@ -99,7 +126,6 @@ const selectTrain = (trainId) => {
   border-radius: 12px;
 }
 
-/* Message aucun train */
 .no-trains-message {
   display: flex;
   align-items: center;
@@ -110,27 +136,25 @@ const selectTrain = (trainId) => {
   font-size: 0.9rem;
   background: #f8faf8;
   border-radius: 8px;
-  border: 1px dashed #dce5dd;
+  border: 1px dashed #e2e8f0;
 }
 
-.no-trains-message span:first-child {
-  font-size: 1.5rem;
+.no-trains-icon {
+  font-size: 1.2rem;
 }
 
-/* Conteneur des options */
 .options-container {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-/* Bouton option */
 .train-option-compact {
   display: flex;
   width: 100%;
   align-items: center;
   justify-content: space-between;
-  border: 1px solid #dce5dd;
+  border: 1px solid #e2e8f0;
   border-radius: 10px;
   padding: 12px 14px;
   color: #17211f;
@@ -139,6 +163,7 @@ const selectTrain = (trainId) => {
   transition: all 0.2s ease;
   -webkit-tap-highlight-color: transparent;
   cursor: pointer;
+  font-family: inherit;
 }
 
 .train-option-compact:hover {
@@ -156,7 +181,6 @@ const selectTrain = (trainId) => {
   transform: scale(0.98);
 }
 
-/* Structure interne */
 .train-info {
   display: flex;
   flex-direction: column;
@@ -168,26 +192,12 @@ const selectTrain = (trainId) => {
   font-size: 0.9rem;
   font-weight: 700;
   color: #17211f;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.route-icon {
-  font-size: 0.9rem;
 }
 
 .date, .time {
   font-size: 0.75rem;
   color: #667672;
   font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.date-icon, .time-icon {
-  font-size: 0.7rem;
 }
 
 .selected-badge {
@@ -204,7 +214,6 @@ const selectTrain = (trainId) => {
   flex-shrink: 0;
 }
 
-/* ===== RESPONSIVE MOBILE ===== */
 @media (max-width: 768px) {
   .train-list-compact {
     padding: 12px;
@@ -239,10 +248,6 @@ const selectTrain = (trainId) => {
   }
   
   .route {
-    font-size: 0.75rem;
-  }
-  
-  .route-icon {
     font-size: 0.75rem;
   }
   
