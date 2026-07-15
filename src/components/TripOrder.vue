@@ -371,7 +371,7 @@ function togglePreview() {
             <span class="price-value">{{ displayedPrice }} MGA</span>
           </div>
 
-          <button 
+          <button v-if="isEditing"
             type="submit" 
             class="submit-btn" 
             :disabled="isSaving"
