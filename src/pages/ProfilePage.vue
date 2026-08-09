@@ -416,7 +416,7 @@ function enableEditing() {
   editForm.phone = user.value.phone || "";
 }
 
-const goBack = () => router.push({ name: 'Dashboard' })
+const goBack = () => router.push({ name: 'Booking' })
 
 function cancelEditing() {
   isEditing.value = false;

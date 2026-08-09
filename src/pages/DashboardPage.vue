@@ -3,8 +3,8 @@
 import Footer from './Footer.vue'
 import { computed, ref, onMounted, onUnmounted, onBeforeUnmount } from "vue";
 import { useRouter } from "vue-router";
-import BookingDashboard from "./BookingDashboard.vue";
-import TicketCartPanel from "./TicketCartPanel.vue";
+import BookingDashboard from "../components/BookingDashboard.vue";
+import TicketCartPanel from "../components/TicketCartPanel.vue";
 import { supabaseClient, supabaseMadarail } from "../lib/supabaseClient.js";
 
 const router = useRouter();
@@ -178,6 +178,7 @@ const user = computed(() => {
   return {
     name: session.user?.displayName || session.user?.full_name || "Voyageur",
     email: session.user?.email || "voyageur@diatsara.mg",
+    cin: session.user?.cin || session.cin || null,
     id:
       session.user?.id ||
       session.userId ||

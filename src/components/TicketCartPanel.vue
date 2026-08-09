@@ -589,9 +589,11 @@ onMounted(() => {
     <div v-if="isModalOpen" class="modal-overlay" @click.self="isModalOpen = false">
       <div class="modal-content" :class="{ 'mobile-modal': isMobile }">
         <button class="close-btn" @click="isModalOpen = false">×</button>
-        <h3>Détails du Billet</h3>
-        <div class="qr-container">
-          <qrcode-vue :value="selectedTicket?.num_ticket || ''" :size="isMobile ? 140 : 160" level="H" render-as="svg" />
+        <div class="details-header">
+          <h3 class="details-title">Détails du Billet</h3>
+          <div class="qr-container">
+            <qrcode-vue :value="selectedTicket?.num_ticket || ''" :size="isMobile ? 140 : 160" level="H" render-as="svg" />
+          </div>
         </div>
         <div class="ticket-info">
           <p v-if="selectedTicket?.mineur" class="minor-badge">Voyageur mineur</p>
@@ -1157,6 +1159,19 @@ onMounted(() => {
 }
 
 /* ===== MODALES ===== */
+.details-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+}
+
+.details-title {
+  margin: 0;
+  color: #17211f;
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -1220,12 +1235,14 @@ onMounted(() => {
 }
 
 .qr-container {
+  display: flex;
   justify-content: center;
-  margin: 16px 0;
+  align-items: center;
+  margin: 0 auto 16px auto;
   padding: 12px;
   border: 1px dashed #24746c;
-  display: inline-block;
   border-radius: 8px;
+  width: fit-content;
 }
 
 .ticket-info {

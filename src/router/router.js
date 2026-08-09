@@ -1,17 +1,19 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import DashboardPage from '../components/DashboardPage.vue'
-import HomePage from '../components/HomePage.vue'
-import LoginPage from '../components/LoginPage.vue'
-import NotFoundPage from '../components/NotFoundPage.vue'
-import RegisterPage from '../components/RegisterPage.vue'
-import ProfilePage from '../components/ProfilePage.vue'
+import HomePage from '../pages/HomePage.vue'
+import LoginPage from '../pages/LoginPage.vue'
+import NotFoundPage from '../pages/NotFoundPage.vue'
+import RegisterPage from '../pages/RegisterPage.vue'
+import ProfilePage from '../pages/ProfilePage.vue'
+import BookingPage from '../pages/BookingPage.vue'
+import TicketPage from '../pages/TicketPage.vue'
 
 const routeNames = {
-  dashboard: 'Dashboard',
   home: 'Home',
   login: 'Login',
   signup: 'Signup',
-  panier: 'Panier', // Ajouté
+  booking: 'Booking',
+  tickets: 'Tickets',
+  profile: 'Profile',
   notFound: 'NotFound',
 }
 
@@ -33,11 +35,11 @@ const routes = [
     component: HomePage,
   },
   {
-  path: '/profile',
-  name: 'Profile',
-  component: ProfilePage,
-  meta: { requiresAuth: true }
-},
+    path: '/profile',
+    name: routeNames.profile,
+    component: ProfilePage,
+    meta: { requiresAuth: true },
+  },
   {
     path: '/login',
     name: routeNames.login,
@@ -51,10 +53,20 @@ const routes = [
     meta: { publicOnly: true },
   },
   {
-    path: '/dashboard',
-    name: routeNames.dashboard,
-    component: DashboardPage,
+    path: '/booking',
+    name: routeNames.booking,
+    component: BookingPage,
     meta: { requiresAuth: true },
+  },
+  {
+    path: '/tickets',
+    name: routeNames.tickets,
+    component: TicketPage,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/dashboard',
+    redirect: { name: routeNames.booking },
   },
   {
     path: '/:pathMatch(.*)*',
@@ -82,7 +94,7 @@ router.beforeEach((to) => {
 
   // Si la route est publique (login/signup) et qu'il y a une session
   if (to.meta.publicOnly && userSession) {
-    return { name: routeNames.dashboard }
+    return { name: routeNames.booking }
   }
 
   return true

@@ -14,8 +14,6 @@
 }
 
 body {
-  display: flex;
-  flex-direction: column;
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
@@ -31,29 +29,11 @@ button {
 }
 
 #app {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
   min-height: 100vh;
 }
 
 .app-shell {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
   min-height: 100vh;
-}
-
-.page-content {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-}
-
-.page-content > * {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
 }
 
 .login-page {

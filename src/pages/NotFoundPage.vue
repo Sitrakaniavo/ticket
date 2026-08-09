@@ -12,8 +12,8 @@ const router = useRouter()
       <p>Retournez a la reservation ou connectez-vous pour continuer.</p>
 
       <div class="not-found-actions">
-        <button class="primary-button" type="button" @click="router.push({ name: 'Dashboard' })">
-          Aller au dashboard
+        <button class="primary-button" type="button" @click="router.push({ name: 'Booking' })">
+          Aller à la réservation
         </button>
         <button class="secondary-button" type="button" @click="router.push({ name: 'Login' })">
           Connexion

@@ -98,10 +98,11 @@ watch(() => props.trains, (newTrains) => {
 
 <style scoped>
 .train-list-compact {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbfb 100%);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 18px;
   padding: 16px;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.06);
 }
 
 .section-heading-compact {
@@ -113,16 +114,16 @@ watch(() => props.trains, (newTrains) => {
 
 .section-heading-compact h2 {
   margin: 0;
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: #17211f;
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #0f172a;
 }
 
 .train-count {
   font-size: 0.75rem;
-  color: #667672;
-  background: #f1f4f1;
-  padding: 2px 10px;
+  color: #0f766e;
+  background: #e8fbf7;
+  padding: 3px 10px;
   border-radius: 12px;
 }
 
@@ -132,11 +133,11 @@ watch(() => props.trains, (newTrains) => {
   justify-content: center;
   gap: 10px;
   padding: 20px;
-  color: #667672;
+  color: #0f172a;
   font-size: 0.9rem;
-  background: #f8faf8;
-  border-radius: 8px;
-  border: 1px dashed #e2e8f0;
+  background: #f8fbfb;
+  border-radius: 12px;
+  border: 1px dashed rgba(15, 23, 42, 0.12);
 }
 
 .no-trains-icon {
@@ -154,11 +155,11 @@ watch(() => props.trains, (newTrains) => {
   width: 100%;
   align-items: center;
   justify-content: space-between;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 14px;
   padding: 12px 14px;
-  color: #17211f;
-  background: #fbfdfb;
+  color: #0f172a;
+  background: #ffffff;
   text-align: left;
   transition: all 0.2s ease;
   -webkit-tap-highlight-color: transparent;
@@ -167,14 +168,14 @@ watch(() => props.trains, (newTrains) => {
 }
 
 .train-option-compact:hover {
-  background: #f4f8f5;
-  border-color: #cad7d0;
+  background: #f4f8f7;
+  border-color: rgba(15, 118, 110, 0.28);
 }
 
 .train-option-compact.selected {
-  border-color: #24746c;
-  background: #eaf6f2;
-  box-shadow: 0 0 0 2px rgba(36, 116, 108, 0.15);
+  border-color: #0f766e;
+  background: #e8fbf7;
+  box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.12);
 }
 
 .train-option-compact:active {
@@ -190,14 +191,14 @@ watch(() => props.trains, (newTrains) => {
 
 .route {
   font-size: 0.9rem;
-  font-weight: 700;
-  color: #17211f;
+  font-weight: 800;
+  color: #0f172a;
 }
 
 .date, .time {
   font-size: 0.75rem;
-  color: #667672;
-  font-weight: 500;
+  color: #5b6570;
+  font-weight: 600;
 }
 
 .selected-badge {
@@ -206,18 +207,18 @@ watch(() => props.trains, (newTrains) => {
   justify-content: center;
   width: 24px;
   height: 24px;
-  background: #24746c;
+  background: linear-gradient(135deg, #0f766e, #14b8a6);
   color: white;
   border-radius: 50%;
   font-size: 0.8rem;
-  font-weight: 700;
+  font-weight: 800;
   flex-shrink: 0;
 }
 
 @media (max-width: 768px) {
   .train-list-compact {
     padding: 12px;
-    border-radius: 8px;
+    border-radius: 14px;
   }
   
   .section-heading-compact h2 {
@@ -226,7 +227,7 @@ watch(() => props.trains, (newTrains) => {
   
   .train-option-compact {
     padding: 10px 12px;
-    border-radius: 8px;
+    border-radius: 10px;
   }
   
   .route {

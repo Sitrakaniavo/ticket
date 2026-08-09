@@ -1,7 +1,7 @@
 <script setup>
 import { reactive, computed, ref, watch, onMounted } from "vue";
 import { supabaseClient } from "../lib/supabaseClient";
-import { useTicketFare } from "./useTicketFare";
+import { useTicketFare } from "../composables/useTicketFare.js";
 import TicketPreviewPanel from "./TicketPreviewPanel.vue";
 
 const props = defineProps({
@@ -41,6 +41,23 @@ const form = reactive({
   arrivee: "",
 });
 
+function getSessionCin() {
+  const session = JSON.parse(localStorage.getItem("rail_user_session") || "{}");
+  const sessionCin = props.user?.cin || session?.user?.cin || session?.cin || "";
+  return String(sessionCin ?? "").trim();
+}
+
+function formatCinValue(rawCin) {
+  if (!rawCin) return "";
+  const digits = String(rawCin).replace(/\D/g, "").slice(0, 12);
+  const blocks = digits.match(/.{1,3}/g);
+  return blocks ? blocks.join(" ") : digits;
+}
+
+function syncFormCinFromSession() {
+  form.cin = formatCinValue(getSessionCin());
+}
+
 // Génération d'un ID unique pour le ticket
 const generateShortId = () =>
   Math.random().toString(36).substring(2, 7).toUpperCase();
@@ -50,14 +67,6 @@ const uniqueTicketSeed = ref(generateShortId());
 function refreshTicketSeed() {
   uniqueTicketSeed.value = generateShortId();
 }
-
-// Surveillance du statut mineur : on réinitialise juste le CIN pour éviter les erreurs de saisie
-watch(
-  () => form.mineur,
-  () => {
-    form.cin = "";
-  },
-);
 
 // Masque et formateur automatique pour le CIN (*** *** *** ***)
 watch(
@@ -73,6 +82,18 @@ watch(
     form.cin = blocks ? blocks.join(" ") : digits;
   },
 );
+
+watch(
+  () => props.user?.cin,
+  () => {
+    syncFormCinFromSession();
+  },
+  { immediate: true },
+);
+
+onMounted(() => {
+  syncFormCinFromSession();
+});
 
 // Injection et liaison de la logique extraite du composable
 const {
@@ -123,13 +144,30 @@ const ticketPreviewData = computed(() => {
   };
 });
 
+const hasFirstClassOption = computed(() => {
+  const firstClassWagons = Number(
+    props.activeTrain?.formation_voiture2 ?? props.activeTrain?.formation_voiture ?? 0,
+  );
+  return firstClassWagons > 0;
+});
+
+watch(
+  () => [hasFirstClassOption.value, form.classe],
+  ([hasFirstClass, selectedClass]) => {
+    if (!hasFirstClass && selectedClass === "1ere") {
+      form.classe = "2eme";
+    }
+  },
+  { immediate: true },
+);
+
 // Fonction pour charger un ticket en édition
 function loadTicketForEdit(ticket) {
   if (!ticket) return;
   
   isEditing.value = true;
   form.nom_voyageur = ticket.nom_voyageur || "";
-  form.cin = ticket.cin ? String(ticket.cin).replace(/(\d{3})(\d{3})(\d{3})(\d{3})/, "$1 $2 $3 $4") : "";
+  form.cin = formatCinValue(getSessionCin() || ticket.cin);
   form.mineur = ticket.mineur || false;
   form.classe = ticket.classe || "2eme";
   form.depart = ticket.depart || "";
@@ -150,15 +188,14 @@ async function handleSubmit() {
     return;
   }
 
-  if (!form.cin) {
-    errorMessage.value = "Le numéro CIN est obligatoire.";
+  const connectedCin = getSessionCin();
+
+  if (!connectedCin) {
+    errorMessage.value = "Aucun CIN n'a été trouvé dans votre compte connecté.";
     return;
   }
 
-  if (!form.mineur && form.cin.replace(/\s/g, "").length !== 12) {
-    errorMessage.value = "Le numéro CIN doit comporter exactement 12 chiffres.";
-    return;
-  }
+  form.cin = formatCinValue(connectedCin);
 
   if (!form.depart || !form.arrivee) {
     errorMessage.value = "Veuillez sélectionner les gares de départ et d'arrivée.";
@@ -194,9 +231,9 @@ async function handleSubmit() {
         ? montantBrut
         : tarifBaseMadarail;
 
-    const cinAsInteger = parseInt(form.cin.replace(/\s/g, ""), 10);
+    const cinAsInteger = parseInt(connectedCin.replace(/\s/g, ""), 10);
 
-    if (!form.mineur && isNaN(cinAsInteger)) {
+    if (Number.isNaN(cinAsInteger)) {
       errorMessage.value = "Le numéro de CIN est invalide.";
       return;
     }
@@ -227,7 +264,7 @@ async function handleSubmit() {
 
     // Réinitialiser le formulaire
     form.nom_voyageur = "";
-    form.cin = "";
+    syncFormCinFromSession();
     form.mineur = false;
     form.depart = "";
     form.arrivee = "";
@@ -248,7 +285,7 @@ async function handleSubmit() {
 // Fonction pour réinitialiser le formulaire
 function resetForm() {
   form.nom_voyageur = "";
-  form.cin = "";
+  syncFormCinFromSession();
   form.mineur = false;
   form.depart = "";
   form.arrivee = "";
@@ -301,14 +338,11 @@ function togglePreview() {
           </label>
 
           <label class="form-field">
-            <span class="field-label">Numéro CIN <span class="required">*</span></span>
-            <input
-              v-model="form.cin"
-              type="text"
-              :placeholder="form.mineur ? 'Ex: CIN du tuteur' : 'Ex: 101 102 103 104'"
-              :disabled="isSaving"
-              :required="!form.mineur"
-            />
+            <span class="field-label">CIN du compte</span>
+            <div class="account-cin-display">
+              <span class="account-cin-value">{{ form.cin || 'CIN non disponible' }}</span>
+              <small>Le CIN de votre compte connecté sera utilisé automatiquement.</small>
+            </div>
           </label>
 
           <div class="form-row">
@@ -354,15 +388,29 @@ function togglePreview() {
           <div class="form-row">
             <label class="form-field">
               <span class="field-label">Classe</span>
-              <select
-                v-model="form.classe"
-                class="select-input"
-                :disabled="isSaving"
-                required
-              >
-                <option value="1ere">1ère classe</option>
-                <option value="2eme">2ème classe</option>
-              </select>
+              <div class="class-toggle-group" :class="{ 'class-toggle-group-disabled': isSaving }">
+                <button
+                  type="button"
+                  class="class-option-btn"
+                  :class="{ active: form.classe === '2eme' }"
+                  @click="form.classe = '2eme'"
+                  :disabled="isSaving"
+                >
+                  2ème classe
+                </button>
+                <button
+                  type="button"
+                  class="class-option-btn"
+                  :class="{ active: form.classe === '1ere' }"
+                  :disabled="isSaving || !hasFirstClassOption"
+                  @click="form.classe = '1ere'"
+                >
+                  1ère classe
+                </button>
+              </div>
+              <small v-if="!hasFirstClassOption" class="class-hint">
+                La 1ère classe n’est pas proposée pour ce voyage.
+              </small>
             </label>
           </div>
 
@@ -419,14 +467,11 @@ function togglePreview() {
           </label>
 
           <label class="form-field">
-            <span class="field-label">Numéro CIN <span class="required">*</span></span>
-            <input
-              v-model="form.cin"
-              type="text"
-              :placeholder="form.mineur ? 'Ex: CIN du tuteur' : 'Ex: 101 102 103 104'"
-              :disabled="isSaving"
-              :required="!form.mineur"
-            />
+            <span class="field-label">CIN du compte</span>
+            <div class="account-cin-display">
+              <span class="account-cin-value">{{ form.cin || 'CIN non disponible' }}</span>
+              <small>Le CIN de votre compte connecté sera utilisé automatiquement.</small>
+            </div>
           </label>
 
           <div class="form-row">
@@ -472,15 +517,29 @@ function togglePreview() {
           <div class="form-row">
             <label class="form-field">
               <span class="field-label">Classe</span>
-              <select
-                v-model="form.classe"
-                class="select-input"
-                :disabled="isSaving"
-                required
-              >
-                <option value="1ere">1ère classe</option>
-                <option value="2eme">2ème classe</option>
-              </select>
+              <div class="class-toggle-group" :class="{ 'class-toggle-group-disabled': isSaving }">
+                <button
+                  type="button"
+                  class="class-option-btn"
+                  :class="{ active: form.classe === '2eme' }"
+                  @click="form.classe = '2eme'"
+                  :disabled="isSaving"
+                >
+                  2ème classe
+                </button>
+                <button
+                  type="button"
+                  class="class-option-btn"
+                  :class="{ active: form.classe === '1ere' }"
+                  :disabled="isSaving || !hasFirstClassOption"
+                  @click="form.classe = '1ere'"
+                >
+                  1ère classe
+                </button>
+              </div>
+              <small v-if="!hasFirstClassOption" class="class-hint">
+                La 1ère classe n’est pas proposée pour ce voyage.
+              </small>
             </label>
           </div>
 
@@ -522,7 +581,6 @@ function togglePreview() {
 </template>
 
 <style scoped>
-/* ===== STYLES EXISTANTS CONSERVÉS ===== */
 .order-grid-container {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -531,48 +589,49 @@ function togglePreview() {
 }
 
 .summary-panel-compact {
-  background: #ffffff;
-  border: 1px solid #dce5dd;
-  border-radius: 6px;
-  padding: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbfb 100%);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.06);
 }
 
 .section-heading-compact {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .section-heading-compact h2 {
   margin: 0;
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #52625e;
-  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #0f172a;
+  font-weight: 800;
 }
 
 .btn-cancel-edit {
-  background: #f1f5f9;
-  border: none;
-  padding: 4px 12px;
-  border-radius: 4px;
+  background: #f4f8f7;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  padding: 5px 12px;
+  border-radius: 999px;
   font-size: 0.75rem;
-  font-weight: 600;
-  color: #64748b;
+  font-weight: 700;
+  color: #0f766e;
   cursor: pointer;
   transition: all 0.15s;
 }
 
 .btn-cancel-edit:hover {
-  background: #e2e8f0;
+  background: #e8fbf7;
 }
 
 .ticket-form-compact {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .form-field {
@@ -584,33 +643,38 @@ function togglePreview() {
 
 .field-label {
   font-size: 0.78rem;
-  font-weight: 600;
+  font-weight: 700;
   color: #52625e;
 }
 
 .required {
-  color: #cc4141;
+  color: #ef4444;
 }
 
 input[type="text"],
 .select-input {
   width: 100%;
-  height: 34px;
-  padding: 0 10px;
-  font-size: 0.85rem;
+  height: 40px;
+  padding: 0 12px;
+  font-size: 0.9rem;
   font-family: inherit;
-  border: 1px solid #dce5dd;
-  border-radius: 4px;
-  background: #fbfdfb;
-  color: #17211f;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 10px;
+  background: #ffffff;
+  color: #0f172a;
   box-sizing: border-box;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input[type="text"]::placeholder {
+  color: #74818c;
 }
 
 input[type="text"]:focus,
 .select-input:focus {
   outline: none;
-  border-color: #24746c;
+  border-color: #0f766e;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
   background: #ffffff;
 }
 
@@ -632,54 +696,125 @@ input[type="text"]:focus,
   margin: 0;
   width: 14px;
   height: 14px;
-  accent-color: #24746c;
+  accent-color: #0f766e;
+}
+
+.account-cin-display {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 10px;
+  background: #f8fbfb;
+  color: #0f172a;
+}
+
+.account-cin-value {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #0f766e;
+}
+
+.account-cin-display small {
+  font-size: 0.72rem;
+  color: #5b6570;
+}
+
+.class-toggle-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+.class-option-btn {
+  min-height: 40px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 10px;
+  background: #ffffff;
+  color: #0f172a;
+  font-weight: 800;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.class-option-btn:hover:not(:disabled) {
+  border-color: #24746c;
+  background: #eaf6f2;
+  color: #24746c;
+}
+
+.class-option-btn.active {
+  background: #24746c;
+  border-color: #24746c;
+  color: #ffffff;
+  box-shadow: 0 10px 22px rgba(36, 116, 108, 0.18);
+}
+
+.class-option-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.class-toggle-group-disabled .class-option-btn {
+  opacity: 0.7;
+}
+
+.class-hint {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 0.7rem;
 }
 
 .price-display-block {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #eaf6f2;
-  border-radius: 4px;
-  padding: 6px 10px;
+  background: #e8fbf7;
+  border-radius: 12px;
+  padding: 10px 12px;
   margin-top: 4px;
 }
 
 .price-label {
   font-size: 0.8rem;
-  font-weight: 700;
-  color: #24746c;
+  font-weight: 800;
+  color: #0f766e;
 }
 
 .price-value {
   font-size: 1.15rem;
-  font-weight: 800;
-  color: #24746c;
+  font-weight: 900;
+  color: #0f766e;
 }
 
 .error-msg {
-  color: #cc4141;
-  font-weight: 600;
-  margin: 4px 0 0 0;
+  color: #b91c1c;
+  font-weight: 700;
+  margin: 2px 0 6px 0;
   font-size: 0.78rem;
 }
 
 .submit-btn {
   width: 100%;
-  padding: 10px;
-  background: #24746c;
+  padding: 11px;
+  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
   color: #ffffff;
   border: none;
-  border-radius: 4px;
-  font-weight: 700;
+  border-radius: 12px;
+  font-weight: 900;
   font-size: 0.9rem;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
   margin-top: 4px;
 }
 
 .submit-btn:hover:not(:disabled) {
-  background: #1d5b57;
+  transform: translateY(-1px);
+  box-shadow: 0 14px 30px rgba(20, 184, 166, 0.24);
 }
 
 .submit-btn:disabled {
@@ -692,10 +827,57 @@ input[type="text"]:focus,
   pointer-events: none;
 }
 
-/* ===== STYLES MOBILE ===== */
 .mobile-order .summary-panel-compact {
   padding: 14px;
-  border-radius: 8px;
+  border-radius: 16px;
+}
+
+.class-toggle-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+.class-option-btn {
+  min-height: 40px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 10px;
+  background: #ffffff;
+  color: #0f172a;
+  font-weight: 800;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.class-option-btn:hover:not(:disabled) {
+  border-color: #24746c;
+  background: #eaf6f2;
+  color: #24746c;
+}
+
+.class-option-btn.active {
+  background: #24746c;
+  border-color: #24746c;
+  color: #ffffff;
+  box-shadow: 0 10px 22px rgba(36, 116, 108, 0.18);
+}
+
+.class-option-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.class-toggle-group-disabled .class-option-btn {
+  opacity: 0.7;
+}
+
+.class-hint {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 0.7rem;
 }
 
 .mobile-order .form-row {
@@ -709,9 +891,9 @@ input[type="text"]:focus,
 
 .mobile-order input[type="text"],
 .mobile-order .select-input {
-  height: 40px;
+  height: 42px;
   font-size: 0.9rem;
-  border-radius: 6px;
+  border-radius: 10px;
 }
 
 .mobile-order .checkbox-field {
@@ -732,25 +914,25 @@ input[type="text"]:focus,
 
 .btn-preview {
   padding: 10px;
-  background: #f1f5f9;
-  border: 1px solid #dce5dd;
-  border-radius: 4px;
-  font-weight: 600;
+  background: #f4f8f7;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 10px;
+  font-weight: 700;
   font-size: 0.85rem;
-  color: #52625e;
+  color: #0f172a;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .btn-preview:active {
-  background: #e2e8f0;
+  background: #e8fbf7;
   transform: scale(0.97);
 }
 
 .mobile-preview {
   margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px solid #dce5dd;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
   animation: slideUp 0.3s ease;
 }
 
@@ -765,7 +947,6 @@ input[type="text"]:focus,
   }
 }
 
-/* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
   .order-grid-container {
     grid-template-columns: 1fr;
@@ -809,7 +990,7 @@ input[type="text"]:focus,
   
   input[type="text"],
   .select-input {
-    height: 30px;
+    height: 36px;
     font-size: 0.8rem;
     padding: 0 8px;
   }
