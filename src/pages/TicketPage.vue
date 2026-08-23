@@ -182,6 +182,9 @@ onBeforeUnmount(() => {
         <router-link to="/booking" class="nav-pill">Réservation</router-link>
         <router-link to="/tickets" class="nav-pill active position-relative">
           Billets
+          <span v-if="cartBadgeCount > 0" class="badge-count-indicator">{{
+            cartBadgeCount
+          }}</span>
         </router-link>
         <router-link to="/profile" class="profile-link">
           <div class="avatar-placeholder">
@@ -193,9 +196,6 @@ onBeforeUnmount(() => {
       <div v-else class="mobile-nav-actions">
         <router-link to="/tickets" class="mobile-ticket-link position-relative">
           Billets
-          <span v-if="cartBadgeCount > 0" class="badge-count-indicator">{{
-            cartBadgeCount
-          }}</span>
         </router-link>
         <button
           type="button"
