@@ -162,10 +162,6 @@ onBeforeUnmount(() => {
           <div class="avatar-placeholder">
             {{ user.name.charAt(0).toUpperCase() }}
           </div>
-          <div class="profile-meta">
-            <span>{{ user.name }}</span>
-            <small>{{ user.email }}</small>
-          </div>
         </router-link>
       </nav>
 
@@ -309,7 +305,10 @@ onBeforeUnmount(() => {
 }
 
 .nav-pill {
-  padding: 10px 14px;
+  display: inline-flex;
+  height: 42px;
+  align-items: center;
+  padding: 0 14px;
   border-radius: 999px;
   background: #f4f8f7;
   border: 1px solid rgba(15, 23, 42, 0.08);
@@ -324,17 +323,20 @@ onBeforeUnmount(() => {
 
 .profile-link {
   display: flex;
+  width: 42px;
+  height: 42px;
   align-items: center;
+  justify-content: center;
   gap: 10px;
-  padding: 6px 10px;
+  padding: 0;
   border-radius: 999px;
   background: #f4f8f7;
   border: 1px solid rgba(15, 23, 42, 0.08);
 }
 
 .avatar-placeholder {
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
   display: grid;
   place-items: center;
   border-radius: 50%;

@@ -11,14 +11,13 @@
 
       <nav v-if="!isMobile" class="topbar-actions">
         <router-link to="/booking" class="nav-pill">Réservation</router-link>
-        <router-link to="/tickets" class="nav-pill">Billets</router-link>
+        <router-link to="/tickets" class="nav-pill position-relative">
+          Billets
+          <span v-if="cartBadgeCount > 0" class="badge-count-indicator">{{ cartBadgeCount }}</span>
+        </router-link>
         <router-link to="/profile" class="profile-link active">
           <div class="avatar-placeholder">
             {{ user.displayName?.charAt(0)?.toUpperCase() || user.full_name?.charAt(0)?.toUpperCase() || "U" }}
-          </div>
-          <div class="profile-meta">
-            <span>{{ user.displayName || user.full_name || "Voyageur" }}</span>
-            <small>{{ user.email || "voyageur@diatsara.mg" }}</small>
           </div>
         </router-link>
       </nav>
@@ -50,6 +49,7 @@
         </router-link>
         <router-link to="/tickets" class="mobile-menu-link" @click="closeMobileMenu">
           Billets
+          <span v-if="cartBadgeCount > 0" class="mobile-badge-count">{{ cartBadgeCount }}</span>
         </router-link>
         <router-link to="/profile" class="mobile-menu-link active" @click="closeMobileMenu">
           Profil
@@ -379,6 +379,7 @@ const passwordSuccess = ref("");
 const isLoadingPassword = ref(false);
 const isMobile = ref(false);
 const isMobileMenuOpen = ref(false);
+const cartBadgeCount = ref(0);
 
 function checkMobile() {
   isMobile.value = window.innerWidth <= 768;
@@ -393,6 +394,33 @@ function toggleMobileMenu() {
 
 function closeMobileMenu() {
   isMobileMenuOpen.value = false;
+}
+
+async function loadCartBadgeCount() {
+  const session = JSON.parse(localStorage.getItem("rail_user_session") || "{}");
+  const currentUserId =
+    session.user?.id ||
+    session.userId ||
+    session.user?.id_user ||
+    session.id_user;
+
+  if (!currentUserId) {
+    cartBadgeCount.value = 0;
+    return;
+  }
+
+  try {
+    const { count, error } = await supabaseClient
+      .from("ticket_voyageur_site")
+      .select("id", { count: "exact", head: true })
+      .eq("id_voyageur", currentUserId);
+
+    if (error) throw error;
+    cartBadgeCount.value = count || 0;
+  } catch (error) {
+    console.error("Erreur compteur billets:", error);
+    cartBadgeCount.value = 0;
+  }
 }
 
 // ===== CHARGEMENT DES DONNÉES UTILISATEUR =====
@@ -638,6 +666,7 @@ const logout = () => {
 // ===== INITIALISATION =====
 onMounted(() => {
   loadUserData();
+  loadCartBadgeCount();
   checkMobile();
   window.addEventListener("resize", checkMobile);
 });
@@ -720,18 +749,43 @@ onBeforeUnmount(() => {
 }
 
 .nav-pill {
-  padding: 10px 14px;
+  display: inline-flex;
+  height: 42px;
+  align-items: center;
+  padding: 0 14px;
   border: 1px solid rgba(15, 23, 42, 0.08);
   border-radius: 999px;
   background: #f4f8f7;
   font-weight: 700;
 }
 
+.position-relative {
+  position: relative;
+}
+
+.badge-count-indicator {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: grid;
+  min-width: 18px;
+  height: 18px;
+  place-items: center;
+  padding: 0 4px;
+  border-radius: 50%;
+  color: #ffffff;
+  background: #ef4444;
+  font-size: 0.72rem;
+}
+
 .profile-link {
   display: flex;
+  width: 42px;
+  height: 42px;
   align-items: center;
+  justify-content: center;
   gap: 10px;
-  padding: 6px 10px;
+  padding: 0;
   border: 1px solid rgba(20, 184, 166, 0.32);
   border-radius: 999px;
   background: #e8fbf7;
@@ -739,8 +793,8 @@ onBeforeUnmount(() => {
 
 .avatar-placeholder {
   display: grid;
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
   place-items: center;
   border-radius: 50%;
   background: #d1fae5;
@@ -768,17 +822,21 @@ onBeforeUnmount(() => {
 
 /* ===== EN-TÊTE ===== */
 .profile-header {
-  background: #ffffff;
-  border-bottom: 1px solid #dce5dd;
-  padding: 32px 24px;
+  padding: 30px clamp(24px, 5vw, 72px);
+  border-bottom: 1px solid #cfe1da;
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.98), rgba(239, 248, 245, 0.96)),
+    #f4f9f7;
+  box-shadow: 0 8px 24px rgba(23, 33, 31, 0.05);
 }
 
 .profile-header-content {
-  max-width: 850px;
+  width: 100%;
+  max-width: none;
   margin: 0 auto;
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 20px;
 }
 
 .profile-avatar-wrapper {
@@ -787,17 +845,18 @@ onBeforeUnmount(() => {
 }
 
 .profile-avatar {
-  width: 80px;
-  height: 80px;
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
   background: #24746c;
   color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2rem;
+  border: 4px solid rgba(255, 255, 255, 0.85);
+  font-size: 1.8rem;
   font-weight: 800;
-  box-shadow: 0 4px 12px rgba(36, 116, 108, 0.25);
+  box-shadow: 0 6px 16px rgba(36, 116, 108, 0.22);
 }
 
 .profile-status-dot {
@@ -817,7 +876,7 @@ onBeforeUnmount(() => {
 
 .profile-user-info h1 {
   margin: 0;
-  font-size: 1.6rem;
+  font-size: 1.5rem;
   font-weight: 800;
   color: #17211f;
 }
@@ -831,25 +890,28 @@ onBeforeUnmount(() => {
 .profile-badge {
   display: flex;
   gap: 8px;
+  align-items: center;
 }
 
 .badge {
   display: inline-block;
   background: #eaf6f2;
   color: #24746c;
-  padding: 2px 12px;
+  padding: 4px 12px;
   border-radius: 20px;
   font-size: 0.7rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  border: 1px solid #cce7dd;
 }
 
 .btn-logout {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 20px;
+  min-height: 42px;
+  padding: 0 18px;
   background: #fef2f2;
   color: #dc2626;
   border: 1px solid #fecaca;
@@ -868,8 +930,9 @@ onBeforeUnmount(() => {
 
 /* ===== CONTENU ===== */
 .profile-content {
-  max-width: 850px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
   padding: 24px;
   display: flex;
   flex-direction: column;
@@ -1163,6 +1226,47 @@ onBeforeUnmount(() => {
   font-size: 0.8rem;
   color: #94a3b8;
   line-height: 1.5;
+}
+
+@media (min-width: 769px) {
+  .profile-content {
+    display: grid;
+    max-width: none;
+    width: 100%;
+    margin: 0;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    align-items: stretch;
+    gap: 18px;
+    padding: 32px 24px 40px;
+  }
+
+  .profile-section {
+    min-width: 0;
+    padding: 24px;
+  }
+
+  .profile-section:nth-child(1) {
+    grid-column: span 7;
+  }
+
+  .profile-section:nth-child(2) {
+    grid-column: span 5;
+  }
+
+  .profile-section:nth-child(3) {
+    grid-column: 1 / -1;
+  }
+
+  .profile-section:nth-child(2) .setting-item {
+    min-height: 66px;
+  }
+
+  .profile-section:nth-child(3) .security-actions {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 20px;
+  }
 }
 
 /* ===== MODAL ===== */
@@ -1485,6 +1589,17 @@ onBeforeUnmount(() => {
   .mobile-menu-link.active {
     color: #0f766e;
     background: #e8fbf7;
+  }
+
+  .mobile-badge-count {
+    display: grid;
+    min-width: 22px;
+    height: 22px;
+    place-items: center;
+    border-radius: 50%;
+    color: #ffffff;
+    background: #ef4444;
+    font-size: 0.72rem;
   }
 
   .profile-header {

@@ -9,6 +9,12 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+html {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #24746c #f1f4f1;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -1853,8 +1859,8 @@ input:focus {
    SCROLLBAR STYLING
    ============================================================ */
 ::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+  width: 3px;
+  height: 3px;
 }
 
 ::-webkit-scrollbar-track {
