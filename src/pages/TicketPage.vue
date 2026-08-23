@@ -13,6 +13,8 @@ const isMobileMenuOpen = ref(false);
 const showToast = ref(false);
 const toastMessage = ref("");
 const toastTimeoutId = ref(null);
+const ticketToDelete = ref(null);
+const isDeletingTicket = ref(false);
 
 function checkMobile() {
   isMobile.value = window.innerWidth <= 768;
@@ -71,22 +73,39 @@ async function loadCartFromSupabase() {
   }
 }
 
-async function handleDeleteItem(ticketId) {
-  if (!confirm("Voulez-vous vraiment supprimer ce billet ?")) return;
+function handleDeleteItem(ticketId) {
+  ticketToDelete.value = cartItems.value.find((ticket) => ticket.id === ticketId) || {
+    id: ticketId,
+  };
+}
+
+function closeDeleteModal() {
+  if (!isDeletingTicket.value) {
+    ticketToDelete.value = null;
+  }
+}
+
+async function confirmDeleteTicket() {
+  if (!ticketToDelete.value || isDeletingTicket.value) return;
+
+  isDeletingTicket.value = true;
 
   try {
     const { error } = await supabaseClient
       .from("ticket_voyageur_site")
       .delete()
-      .eq("id", ticketId);
+      .eq("id", ticketToDelete.value.id);
 
     if (error) throw error;
 
+    ticketToDelete.value = null;
     triggerToast("Le billet a été supprimé avec succès.");
     await loadCartFromSupabase();
   } catch (error) {
     console.error("Erreur lors de la suppression :", error.message);
     triggerToast("Impossible de supprimer le billet.", 3000);
+  } finally {
+    isDeletingTicket.value = false;
   }
 }
 
@@ -210,6 +229,47 @@ onBeforeUnmount(() => {
     <Transition name="toast-fade">
       <div v-if="showToast" class="toast-notification">
         <p>{{ toastMessage }}</p>
+      </div>
+    </Transition>
+
+    <Transition name="modal-fade">
+      <div
+        v-if="ticketToDelete"
+        class="delete-modal-overlay"
+        role="presentation"
+        @click.self="closeDeleteModal"
+      >
+        <section
+          class="delete-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-modal-title"
+        >
+          <div class="delete-modal-icon" aria-hidden="true">!</div>
+          <h2 id="delete-modal-title">Annuler ce billet ?</h2>
+          <p>
+            Voulez-vous vraiment annuler le billet de 
+            <strong>{{ ticketToDelete.nom_voyageur || "sélectionné" }}</strong> ?
+          </p>
+          <div class="delete-modal-actions">
+            <button
+              type="button"
+              class="delete-cancel-button"
+              :disabled="isDeletingTicket"
+              @click="closeDeleteModal"
+            >
+              Non, conserver
+            </button>
+            <button
+              type="button"
+              class="delete-confirm-button"
+              :disabled="isDeletingTicket"
+              @click="confirmDeleteTicket"
+            >
+              {{ isDeletingTicket ? "Annulation..." : "Oui, annuler" }}
+            </button>
+          </div>
+        </section>
       </div>
     </Transition>
 
@@ -383,8 +443,9 @@ onBeforeUnmount(() => {
 
 .toast-notification {
   position: fixed;
-  right: 20px;
-  bottom: 20px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   background: #ffffff;
   color: #0f172a;
   padding: 12px 16px;
@@ -392,6 +453,95 @@ onBeforeUnmount(() => {
   z-index: 50;
   box-shadow: 0 18px 36px rgba(15, 23, 42, 0.14);
   border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.delete-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.delete-modal {
+  width: min(420px, 100%);
+  padding: 28px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.2);
+  text-align: center;
+}
+
+.delete-modal-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 16px;
+  place-items: center;
+  border-radius: 50%;
+  color: #b42318;
+  background: #fee4e2;
+  font-size: 1.4rem;
+  font-weight: 900;
+}
+
+.delete-modal h2 {
+  margin: 0;
+  color: #17211f;
+  font-size: 1.35rem;
+}
+
+.delete-modal p {
+  margin: 12px 0 0;
+  color: #64748b;
+  line-height: 1.6;
+}
+
+.delete-modal-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.delete-cancel-button,
+.delete-confirm-button {
+  min-height: 44px;
+  border-radius: 8px;
+  padding: 0 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.delete-cancel-button {
+  border: 1px solid #cad7d0;
+  color: #17211f;
+  background: #ffffff;
+}
+
+.delete-confirm-button {
+  border: 1px solid #b42318;
+  color: #ffffff;
+  background: #b42318;
+}
+
+.delete-cancel-button:disabled,
+.delete-confirm-button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition: opacity 0.18s ease;
+}
+
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
 }
 
 .badge-count-indicator {
@@ -535,9 +685,7 @@ onBeforeUnmount(() => {
   }
 
   .toast-notification {
-    right: 16px;
-    bottom: 16px;
-    left: 16px;
+    width: min(90vw, 420px);
   }
 }
 </style>

@@ -147,7 +147,7 @@ async function handleDeleteItem(ticketId) {
 
     if (error) throw error
 
-    triggerToast('Le billet a été supprimé avec succès.')
+    triggerToast('Le billet a été annulé avec succès.')
     await loadCartFromSupabase()
   } catch (error) {
     console.error('Erreur lors de la suppression :', error.message)
@@ -415,8 +415,9 @@ onBeforeUnmount(() => {
 
 .toast-notification {
   position: fixed;
-  right: 20px;
-  bottom: 20px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   background: #ffffff;
   color: #0f172a;
   padding: 12px 16px;
@@ -564,9 +565,7 @@ onBeforeUnmount(() => {
   }
 
   .toast-notification {
-    right: 16px;
-    bottom: 16px;
-    left: 16px;
+    width: min(90vw, 420px);
   }
 }
 

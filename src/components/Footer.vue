@@ -67,7 +67,7 @@ footer.app-footer {
 
 @media (max-width: 768px) {
   footer.app-footer {
-    zoom: 0.7;
+    zoom: 0.8;
   }
 }
 </style>

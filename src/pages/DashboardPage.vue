@@ -875,8 +875,9 @@ onMounted(() => {
 /* ===== TOAST ===== */
 .toast-notification {
   position: fixed;
-  bottom: 24px;
-  right: 24px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   background: #17211f;
   color: #ffffff;
   padding: 12px 20px;
@@ -888,9 +889,7 @@ onMounted(() => {
 }
 
 .mobile-toast {
-  bottom: 16px;
-  right: 16px;
-  left: 16px;
+  width: min(90vw, 380px);
   max-width: none;
   padding: 12px 16px;
 }
@@ -910,7 +909,7 @@ onMounted(() => {
 .toast-fade-enter-from,
 .toast-fade-leave-to {
   opacity: 0;
-  transform: translateY(10px);
+  transform: translate(-50%, calc(-50% + 10px));
 }
 
 /* ===== RESPONSIVE ===== */
