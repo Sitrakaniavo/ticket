@@ -34,7 +34,7 @@ function closeMobileMenu() {
   isMobileMenuOpen.value = false
 }
 
-function triggerToast(message, duration = 3000) {
+function showConfirmationModal(message, duration = 2000) {
   toastMessage.value = message
   showToast.value = true
 
@@ -100,9 +100,13 @@ function selectTrain(trainId) {
   selectedTrain.value = trainId || ''
 }
 
-function logout() {
-  localStorage.removeItem('rail_user_session')
-  router.push({ name: 'Home' })
+async function logout() {
+  try {
+    await supabaseClient.auth.signOut()
+  } finally {
+    localStorage.removeItem('rail_user_session')
+    router.push({ name: 'Home' })
+  }
 }
 
 const activeTrain = computed(() => {
@@ -125,7 +129,7 @@ const user = computed(() => {
 async function handleTicketSaved(newTicket) {
   await loadCartFromSupabase()
   editingTicket.value = null
-  triggerToast(`Le billet de ${newTicket?.nom_voyageur || 'du voyageur'} a été validé et enregistré.`, 4000)
+  showConfirmationModal(`Le billet de ${newTicket?.nom_voyageur || 'du voyageur'} a été validé et enregistré.`, 2000)
 }
 
 function handleEditItem(ticket) {
@@ -136,7 +140,7 @@ function handleEditItem(ticket) {
     loadCartFromSupabase()
   }
 
-  triggerToast(`Le billet de ${ticket.nom_voyageur || 'du voyageur'} a été modifié avec succès.`, 3000)
+  showConfirmationModal(`Le billet de ${ticket.nom_voyageur || 'du voyageur'} a été modifié avec succès.`, 2000)
 }
 
 async function handleDeleteItem(ticketId) {
@@ -147,11 +151,11 @@ async function handleDeleteItem(ticketId) {
 
     if (error) throw error
 
-    triggerToast('Le billet a été annulé avec succès.')
+    showConfirmationModal('Le billet a été annulé avec succès.')
     await loadCartFromSupabase()
   } catch (error) {
     console.error('Erreur lors de la suppression :', error.message)
-    triggerToast('Impossible de supprimer le billet.', 3000)
+    showConfirmationModal('Impossible de supprimer le billet.', 2000)
   }
 }
 
@@ -233,9 +237,13 @@ onBeforeUnmount(() => {
         </nav>
     </header>
 
-    <Transition name="toast-fade">
-      <div v-if="showToast" class="toast-notification">
-        <p>{{ toastMessage }}</p>
+    <Transition name="modal-fade">
+      <div v-if="showToast" class="delete-modal-overlay" role="presentation">
+        <section class="delete-modal success-modal" role="status" aria-live="polite">
+          <div class="delete-modal-icon success-modal-icon" aria-hidden="true">✓</div>
+          <h2>Billet validé</h2>
+          <p>{{ toastMessage }}</p>
+        </section>
       </div>
     </Transition>
 
@@ -413,18 +421,73 @@ onBeforeUnmount(() => {
   margin: 0 auto;
 }
 
-.toast-notification {
+.delete-modal-overlay {
   position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: #ffffff;
-  color: #0f172a;
-  padding: 12px 16px;
-  border-radius: 14px;
+  inset: 0;
   z-index: 50;
-  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.14);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.68);
+  backdrop-filter: blur(3px);
+}
+
+.delete-modal,
+.success-modal {
+  width: min(420px, 100%);
+  padding: 28px;
   border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 12px;
+  background: #ffffff;
+  color: #17211f;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.2);
+  text-align: center;
+}
+
+.delete-modal-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 16px;
+  place-items: center;
+  border-radius: 50%;
+  color: #24746c;
+  background: #d9f3e8;
+  font-size: 1.4rem;
+  font-weight: 900;
+}
+
+.delete-modal h2 {
+  margin: 0;
+  color: #17211f;
+  font-size: 1.35rem;
+}
+
+.delete-modal p {
+  margin: 12px 0 0;
+  color: #64748b;
+  line-height: 1.6;
+}
+
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition: opacity 0.28s ease;
+}
+
+.modal-fade-enter-active .delete-modal,
+.modal-fade-leave-active .delete-modal {
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.28s ease;
+}
+
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
+}
+
+.modal-fade-enter-from .delete-modal,
+.modal-fade-leave-to .delete-modal {
+  opacity: 0;
+  transform: translateY(18px) scale(0.94);
 }
 
 .badge-count-indicator {
@@ -564,8 +627,8 @@ onBeforeUnmount(() => {
     padding: 22px 16px;
   }
 
-  .toast-notification {
-    width: min(90vw, 420px);
+  .delete-modal-overlay {
+    padding: 16px;
   }
 }
 

@@ -86,7 +86,7 @@ defineEmits(['submit'])
           <p class="label">Net à payer</p>
           <p class="final-price">{{ previewData.amount }} MGA</p>
         </div>
-        <button class="confirm-btn" @click="$emit('submit')">
+        <button v-if="!isMobile" class="confirm-btn" @click="$emit('submit')">
           Valider le billet
         </button>
       </div>

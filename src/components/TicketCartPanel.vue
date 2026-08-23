@@ -5,6 +5,7 @@ import { supabaseClient, supabaseMadarail } from '../lib/supabaseClient'
 
 const props = defineProps({
   cartItems: { type: Array, required: true, default: () => [] },
+  isLoading: { type: Boolean, default: false },
   isMobile: { type: Boolean, default: false }
 })
 
@@ -157,6 +158,10 @@ const enrichedTickets = computed(() => {
       voyage_statut: null
     }
   })
+})
+
+const isTicketsLoading = computed(() => {
+  return props.isLoading || isLoadingVoyages.value
 })
 
 // ===== COMPTER LES BILLETS ACTIFS =====
@@ -528,8 +533,37 @@ onMounted(() => {
       <span>Pour valider les billets, présentez-vous au vendeur.</span>
     </div>
 
+    <!-- Chargement des billets -->
+    <div v-if="isTicketsLoading" class="tickets-loading-state" role="status" aria-live="polite">
+      <div class="tickets-loading-heading">
+        <span class="loading-orbit" aria-hidden="true"></span>
+        <div>
+          <strong>Chargement de vos billets</strong>
+          <span>Récupération de votre historique...</span>
+        </div>
+      </div>
+      <div class="tickets-loading-grid" aria-hidden="true">
+        <div v-for="slot in 3" :key="slot" class="ticket-skeleton">
+          <div class="skeleton-line skeleton-line-short"></div>
+          <div class="skeleton-line skeleton-line-status"></div>
+          <div class="skeleton-route">
+            <div class="skeleton-line skeleton-line-station"></div>
+            <div class="skeleton-line skeleton-line-arrow"></div>
+            <div class="skeleton-line skeleton-line-station"></div>
+          </div>
+          <div class="skeleton-line skeleton-line-meta"></div>
+          <div class="skeleton-line skeleton-line-name"></div>
+          <div class="skeleton-footer">
+            <div class="skeleton-line skeleton-line-price"></div>
+            <div class="skeleton-line skeleton-line-button"></div>
+          </div>
+        </div>
+      </div>
+      <span class="sr-only">Chargement en cours</span>
+    </div>
+
     <!-- État vide - Aucun billet -->
-    <div v-if="enrichedTickets.length === 0" class="empty-tickets-state">
+    <div v-else-if="enrichedTickets.length === 0" class="empty-tickets-state">
       <div class="empty-tickets-icon">🎫</div>
       <h3 class="empty-tickets-title">Aucun billet enregistré</h3>
       <p class="empty-tickets-text">
@@ -652,7 +686,7 @@ onMounted(() => {
 
     <!-- MODALE DÉTAILS -->
     <div v-if="isModalOpen" class="modal-overlay" @click.self="isModalOpen = false">
-      <div class="modal-content" :class="{ 'mobile-modal': isMobile }">
+      <div class="modal-content">
         <button class="close-btn" @click="isModalOpen = false">×</button>
         <div class="details-header">
           <h3 class="details-title">Détails du Billet</h3>
@@ -881,6 +915,140 @@ onMounted(() => {
   font-size: 0.7rem;
   font-weight: 700;
   flex-shrink: 0;
+}
+
+/* ===== CHARGEMENT DES BILLETS ===== */
+.tickets-loading-state {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 300px;
+  padding: 22px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid #dce5dd;
+  border-radius: 12px;
+}
+
+.tickets-loading-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #24746c;
+}
+
+.tickets-loading-heading strong,
+.tickets-loading-heading span {
+  display: block;
+}
+
+.tickets-loading-heading strong {
+  font-size: 0.92rem;
+}
+
+.tickets-loading-heading span {
+  margin-top: 3px;
+  color: #7b8b86;
+  font-size: 0.78rem;
+}
+
+.loading-orbit {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border: 3px solid #d9ebe5;
+  border-top-color: #24746c;
+  border-right-color: #e3a857;
+  border-radius: 50%;
+  animation: ticket-loader-spin 0.9s linear infinite;
+}
+
+.tickets-loading-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.ticket-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 220px;
+  padding: 16px;
+  overflow: hidden;
+  border: 1px solid #e4ece8;
+  border-radius: 10px;
+  background: #fbfdfb;
+}
+
+.skeleton-line {
+  position: relative;
+  overflow: hidden;
+  height: 11px;
+  border-radius: 6px;
+  background: #e5eeeb;
+}
+
+.skeleton-line::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);
+  content: '';
+  transform: translateX(-100%);
+  animation: ticket-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-line-short { width: 42%; }
+.skeleton-line-status { width: 24%; margin-left: auto; margin-top: -27px; }
+.skeleton-line-station { width: 34%; }
+.skeleton-line-arrow { width: 12%; }
+.skeleton-line-meta { width: 68%; }
+.skeleton-line-name { width: 52%; }
+
+.skeleton-route {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.skeleton-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid #e8efec;
+}
+
+.skeleton-line-price { width: 30%; }
+.skeleton-line-button { width: 28%; height: 25px; }
+
+@keyframes ticket-loader-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes ticket-skeleton-shimmer {
+  to { transform: translateX(100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-orbit,
+  .skeleton-line::after {
+    animation: none;
+  }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* ===== ÉTAT VIDE ===== */
@@ -1628,8 +1796,28 @@ onMounted(() => {
 }
 
 .mobile-cart .btn-refresh-cart {
+  align-self: flex-end;
   justify-content: center;
-  padding: 8px;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 1px solid #24746c;
+  border-radius: 50%;
+  background: #24746c;
+  color: #ffffff;
+  font-size: 1.35rem;
+  line-height: 1;
+  box-shadow: 0 5px 14px rgba(36, 116, 108, 0.22);
+}
+
+.mobile-cart .btn-refresh-cart:hover {
+  background: #1d5b57;
+  border-color: #1d5b57;
+  box-shadow: 0 7px 18px rgba(36, 116, 108, 0.3);
+}
+
+.mobile-cart .btn-refresh-cart:active {
+  transform: scale(0.92) rotate(-20deg);
 }
 
 .mobile-notice {

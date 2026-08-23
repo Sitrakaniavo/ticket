@@ -30,6 +30,7 @@ const isSaving = ref(false);
 const errorMessage = ref("");
 const isEditing = ref(false);
 const showPreview = ref(false);
+const submissionKey = ref(crypto.randomUUID());
 
 // Formulaire réactif initialisé localement
 const form = reactive({
@@ -66,6 +67,10 @@ const uniqueTicketSeed = ref(generateShortId());
 // Fonction pour générer un nouveau seed
 function refreshTicketSeed() {
   uniqueTicketSeed.value = generateShortId();
+}
+
+function refreshSubmissionKey() {
+  submissionKey.value = crypto.randomUUID();
 }
 
 // Masque et formateur automatique pour le CIN (*** *** *** ***)
@@ -254,13 +259,17 @@ async function handleSubmit() {
       sens: sensArray,
     };
 
-    const { data, error } = await supabaseClient
-      .from("ticket_voyageur_site")
-      .insert([ticketToInsert])
-      .select()
-      .single();
+    const { data, error } = await supabaseClient.rpc("create_ticket_idempotent", {
+      p_ticket: ticketToInsert,
+      p_idempotency_key: submissionKey.value,
+    });
 
     if (error) throw error;
+
+    const savedTicket = Array.isArray(data) ? data[0] : data;
+    if (!savedTicket) {
+      throw new Error("Le billet n'a pas pu être confirmé par le serveur.");
+    }
 
     // Réinitialiser le formulaire
     form.nom_voyageur = "";
@@ -270,10 +279,11 @@ async function handleSubmit() {
     form.arrivee = "";
     isEditing.value = false;
     refreshTicketSeed();
+    refreshSubmissionKey();
     showPreview.value = false;
 
     // Émettre l'événement pour mettre à jour la liste
-    emit("ticket-saved", data);
+    emit("ticket-saved", savedTicket);
   } catch (error) {
     console.error("Erreur lors de la création du ticket :", error);
     errorMessage.value = error.message || "Impossible d'enregistrer le ticket.";
@@ -432,6 +442,7 @@ function togglePreview() {
       <TicketPreviewPanel
         :preview-data="ticketPreviewData"
         :is-editing="isEditing"
+        :is-mobile="isMobile"
         :class="{ 'panel-disabled': isSaving }"
         @submit="handleSubmit"
       />
@@ -571,6 +582,7 @@ function togglePreview() {
           <TicketPreviewPanel
             :preview-data="ticketPreviewData"
             :is-editing="isEditing"
+            :is-mobile="isMobile"
             :class="{ 'panel-disabled': isSaving }"
             @submit="handleSubmit"
           />

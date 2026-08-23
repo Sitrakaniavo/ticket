@@ -15,6 +15,7 @@ const toastMessage = ref("");
 const toastTimeoutId = ref(null);
 const ticketToDelete = ref(null);
 const isDeletingTicket = ref(false);
+const isLoadingTickets = ref(true);
 
 function checkMobile() {
   isMobile.value = window.innerWidth <= 768;
@@ -31,7 +32,7 @@ function closeMobileMenu() {
   isMobileMenuOpen.value = false;
 }
 
-function triggerToast(message, duration = 3000) {
+function showConfirmationModal(message, duration = 1500) {
   toastMessage.value = message;
   showToast.value = true;
 
@@ -46,6 +47,7 @@ function triggerToast(message, duration = 3000) {
 }
 
 async function loadCartFromSupabase() {
+  isLoadingTickets.value = true;
   const session = JSON.parse(localStorage.getItem("rail_user_session") || "{}");
   const currentUserId =
     session.user?.id ||
@@ -55,6 +57,7 @@ async function loadCartFromSupabase() {
 
   if (!currentUserId) {
     cartItems.value = [];
+    isLoadingTickets.value = false;
     return;
   }
 
@@ -70,6 +73,8 @@ async function loadCartFromSupabase() {
   } catch (error) {
     console.error("Erreur panier:", error);
     cartItems.value = [];
+  } finally {
+    isLoadingTickets.value = false;
   }
 }
 
@@ -99,11 +104,11 @@ async function confirmDeleteTicket() {
     if (error) throw error;
 
     ticketToDelete.value = null;
-    triggerToast("Le billet a été supprimé avec succès.");
+    showConfirmationModal("Le billet a été supprimé avec succès.");
     await loadCartFromSupabase();
   } catch (error) {
     console.error("Erreur lors de la suppression :", error.message);
-    triggerToast("Impossible de supprimer le billet.", 3000);
+    showConfirmationModal("Impossible de supprimer le billet.", 1500);
   } finally {
     isDeletingTicket.value = false;
   }
@@ -117,15 +122,19 @@ function handleEditItem(ticket) {
     loadCartFromSupabase();
   }
 
-  triggerToast(
+  showConfirmationModal(
     `Le billet de ${ticket.nom_voyageur || "du voyageur"} a été modifié avec succès.`,
-    3000,
+    1500,
   );
 }
 
-function logout() {
-  localStorage.removeItem("rail_user_session");
-  router.push({ name: "Home" });
+async function logout() {
+  try {
+    await supabaseClient.auth.signOut();
+  } finally {
+    localStorage.removeItem("rail_user_session");
+    router.push({ name: "Home" });
+  }
 }
 
 const cartBadgeCount = computed(() => cartItems.value.length);
@@ -226,9 +235,17 @@ onBeforeUnmount(() => {
       </nav>
     </header>
 
-    <Transition name="toast-fade">
-      <div v-if="showToast" class="toast-notification">
-        <p>{{ toastMessage }}</p>
+    <Transition name="modal-fade">
+      <div v-if="showToast" class="delete-modal-overlay" role="presentation">
+        <section
+          class="delete-modal success-modal"
+          role="status"
+          aria-live="polite"
+        >
+          <div class="delete-modal-icon success-modal-icon" aria-hidden="true">✓</div>
+          <h2>Billet annulé</h2>
+          <p>{{ toastMessage }}</p>
+        </section>
       </div>
     </Transition>
 
@@ -282,6 +299,7 @@ onBeforeUnmount(() => {
       <div class="ticket-card">
         <TicketCartPanel
           :cart-items="cartItems"
+          :is-loading="isLoadingTickets"
           :is-mobile="isMobile"
           @remove-item="handleDeleteItem"
           @edit-item="handleEditItem"
@@ -441,20 +459,6 @@ onBeforeUnmount(() => {
   margin: 0 auto;
 }
 
-.toast-notification {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: #ffffff;
-  color: #0f172a;
-  padding: 12px 16px;
-  border-radius: 14px;
-  z-index: 50;
-  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.14);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-}
-
 .delete-modal-overlay {
   position: fixed;
   inset: 0;
@@ -462,7 +466,8 @@ onBeforeUnmount(() => {
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(15, 23, 42, 0.42);
+  background: rgba(15, 23, 42, 0.68);
+  backdrop-filter: blur(3px);
 }
 
 .delete-modal {
@@ -486,6 +491,11 @@ onBeforeUnmount(() => {
   background: #fee4e2;
   font-size: 1.4rem;
   font-weight: 900;
+}
+
+.success-modal-icon {
+  color: #24746c;
+  background: #d9f3e8;
 }
 
 .delete-modal h2 {
@@ -536,12 +546,23 @@ onBeforeUnmount(() => {
 
 .modal-fade-enter-active,
 .modal-fade-leave-active {
-  transition: opacity 0.18s ease;
+  transition: opacity 0.28s ease;
+}
+
+.modal-fade-enter-active .delete-modal,
+.modal-fade-leave-active .delete-modal {
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.28s ease;
 }
 
 .modal-fade-enter-from,
 .modal-fade-leave-to {
   opacity: 0;
+}
+
+.modal-fade-enter-from .delete-modal,
+.modal-fade-leave-to .delete-modal {
+  opacity: 0;
+  transform: translateY(18px) scale(0.94);
 }
 
 .badge-count-indicator {
@@ -684,8 +705,5 @@ onBeforeUnmount(() => {
     line-height: 1.5;
   }
 
-  .toast-notification {
-    width: min(90vw, 420px);
-  }
 }
 </style>

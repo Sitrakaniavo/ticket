@@ -657,10 +657,14 @@ async function changePassword() {
 }
 
 // ===== DÉCONNEXION =====
-const logout = () => {
-  localStorage.removeItem("rail_user_session");
-  localStorage.removeItem("user_preferences");
-  router.push("/login");
+const logout = async () => {
+  try {
+    await supabaseClient.auth.signOut();
+  } finally {
+    localStorage.removeItem("rail_user_session");
+    localStorage.removeItem("user_preferences");
+    router.push("/login");
+  }
 };
 
 // ===== INITIALISATION =====

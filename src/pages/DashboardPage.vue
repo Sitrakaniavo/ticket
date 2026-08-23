@@ -23,6 +23,12 @@ const isMobileMenuOpen = ref(false);
 let toastTimeoutId = null;
 let refreshInterval = null;
 
+const toastTitle = computed(() => {
+  return toastMessage.value.includes("validé") || toastMessage.value.includes("enregistré")
+    ? "Billet validé"
+    : "Action confirmée";
+});
+
 // Détection mobile
 const isMobile = ref(false);
 
@@ -42,7 +48,7 @@ function selectTrain(trainId) {
   }
 }
 // ===== TOAST =====
-function triggerToast(message, duration = 3000) {
+function showConfirmationModal(message, duration = 1500) {
   toastMessage.value = message;
   showToast.value = true;
 
@@ -142,11 +148,11 @@ async function handleDeleteItem(ticketId) {
 
     if (error) throw error;
 
-    triggerToast("Le billet a été supprimé avec succès.");
+    showConfirmationModal("Le billet a été supprimé avec succès.");
     await loadCartFromSupabase();
   } catch (error) {
     console.error("Erreur lors de la suppression :", error.message);
-    triggerToast("Impossible de supprimer le billet.", 3000);
+    showConfirmationModal("Impossible de supprimer le billet.", 1500);
   }
 }
 
@@ -159,9 +165,9 @@ function handleEditItem(ticket) {
     loadCartFromSupabase();
   }
 
-  triggerToast(
+  showConfirmationModal(
     `Le billet de ${ticket.nom_voyageur || "du voyageur"} a été modifié avec succès.`,
-    3000,
+    1500,
   );
 }
 
@@ -188,18 +194,22 @@ const user = computed(() => {
   };
 });
 
-function logout() {
-  localStorage.removeItem("rail_user_session");
-  router.push({ name: "Home" });
+async function logout() {
+  try {
+    await supabaseClient.auth.signOut();
+  } finally {
+    localStorage.removeItem("rail_user_session");
+    router.push({ name: "Home" });
+  }
 }
 
 // ===== GESTION DES TICKETS =====
 async function handleTicketSaved(newTicket) {
   await loadCartFromSupabase();
   editingTicket.value = null;
-  triggerToast(
+  showConfirmationModal(
     `Le billet de ${newTicket?.nom_voyageur || "du voyageur"} a été validé et enregistré.`,
-    4000,
+    1500,
   );
 }
 
@@ -339,16 +349,14 @@ onMounted(() => {
       </div>
     </header>
 
-    <!-- TOAST NOTIFICATION -->
-    <Transition name="toast-fade">
-      <div
-        v-if="showToast"
-        class="toast-notification"
-        :class="{ 'mobile-toast': isMobile }"
-      >
-        <div class="toast-content">
+    <!-- CONFIRMATION -->
+    <Transition name="modal-fade">
+      <div v-if="showToast" class="delete-modal-overlay" role="presentation">
+        <section class="delete-modal success-modal" role="status" aria-live="polite">
+          <div class="delete-modal-icon success-modal-icon" aria-hidden="true">✓</div>
+          <h2>{{ toastTitle }}</h2>
           <p>{{ toastMessage }}</p>
-        </div>
+        </section>
       </div>
     </Transition>
 
@@ -872,44 +880,75 @@ onMounted(() => {
   }
 }
 
-/* ===== TOAST ===== */
-.toast-notification {
+/* ===== CONFIRMATION MODALE ===== */
+.delete-modal-overlay {
   position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: #17211f;
-  color: #ffffff;
-  padding: 12px 20px;
-  border-radius: 8px;
-  box-shadow: 0 24px 60px rgba(23, 33, 31, 0.2);
+  inset: 0;
   z-index: 9999;
-  max-width: 380px;
-  pointer-events: none;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.68);
+  backdrop-filter: blur(3px);
 }
 
-.mobile-toast {
-  width: min(90vw, 380px);
-  max-width: none;
-  padding: 12px 16px;
+.delete-modal,
+.success-modal {
+  width: min(420px, 100%);
+  padding: 28px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 12px;
+  background: #ffffff;
+  color: #17211f;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.2);
+  text-align: center;
 }
 
-.toast-content p {
+.delete-modal-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 16px;
+  place-items: center;
+  border-radius: 50%;
+  color: #24746c;
+  background: #d9f3e8;
+  font-size: 1.4rem;
+  font-weight: 900;
+}
+
+.delete-modal h2 {
   margin: 0;
-  font-size: 0.85rem;
-  font-weight: 500;
-  line-height: 1.4;
+  color: #17211f;
+  font-size: 1.35rem;
 }
 
-.toast-fade-enter-active,
-.toast-fade-leave-active {
-  transition: all 0.25s ease;
+.delete-modal p {
+  margin: 0;
+  color: #64748b;
+  margin-top: 12px;
+  line-height: 1.6;
 }
 
-.toast-fade-enter-from,
-.toast-fade-leave-to {
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition: opacity 0.28s ease;
+}
+
+.modal-fade-enter-active .delete-modal,
+.modal-fade-leave-active .delete-modal {
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.28s ease;
+}
+
+.modal-fade-enter-from,
+.modal-fade-leave-to {
   opacity: 0;
-  transform: translate(-50%, calc(-50% + 10px));
+}
+
+.modal-fade-enter-from .delete-modal,
+.modal-fade-leave-to .delete-modal {
+  opacity: 0;
+  transform: translateY(18px) scale(0.94);
 }
 
 /* ===== RESPONSIVE ===== */
@@ -1049,11 +1088,8 @@ onMounted(() => {
     font-size: 0.85rem;
   }
 
-  .toast-notification {
-    bottom: 12px;
-    right: 12px;
-    left: 12px;
-    padding: 10px 14px;
+  .delete-modal-overlay {
+    padding: 16px;
   }
 }
 </style>
