@@ -10,6 +10,7 @@
 }
 
 html {
+  max-width: 100%;
   scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: #24746c #f1f4f1;
@@ -21,6 +22,7 @@ html {
 }
 
 body {
+  max-width: 100%;
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
