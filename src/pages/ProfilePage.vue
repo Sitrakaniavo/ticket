@@ -32,9 +32,10 @@
           :aria-label="isMobileMenuOpen ? 'Fermer le menu' : 'Ouvrir le menu'"
           @click="toggleMobileMenu"
         >
-          <span></span>
-          <span></span>
-          <span></span>
+            <span class="menu-line"></span>
+            <span class="menu-line"></span>
+            <span class="menu-line"></span>
+            <span v-if="cartBadgeCount > 0" class="mobile-menu-count">{{ cartBadgeCount }}</span>
         </button>
       </div>
 
@@ -1547,6 +1548,7 @@ onBeforeUnmount(() => {
   }
 
   .mobile-menu-button {
+    position: relative;
     display: grid;
     width: 44px;
     place-content: center;
@@ -1557,12 +1559,29 @@ onBeforeUnmount(() => {
     background: #f4f8f7;
   }
 
-  .mobile-menu-button span {
+  .mobile-menu-button .menu-line {
     display: block;
     width: 18px;
     height: 2px;
     border-radius: 2px;
     background: currentColor;
+  }
+
+  .mobile-menu-count {
+    position: absolute;
+    top: -7px;
+    right: -7px;
+    display: grid;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    place-items: center;
+    border: 2px solid #ffffff;
+    border-radius: 999px;
+    background: #ef4444;
+    color: #ffffff;
+    font-size: 0.65rem;
+    font-weight: 800;
   }
 
   .mobile-menu {

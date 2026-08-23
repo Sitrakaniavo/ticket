@@ -308,7 +308,14 @@ onMounted(() => {
             {{ cartBadgeCount }}
           </span>
         </button>
-        <button class="mobile-menu-btn" @click="toggleMobileMenu">☰</button>
+        <button
+          class="mobile-menu-btn position-relative"
+          @click="toggleMobileMenu"
+          aria-label="Ouvrir le menu"
+        >
+          ☰
+          <span v-if="cartBadgeCount > 0" class="mobile-menu-count">{{ cartBadgeCount }}</span>
+        </button>
       </div>
 
       <!-- Menu Mobile -->
@@ -607,6 +614,7 @@ onMounted(() => {
 }
 
 .mobile-menu-btn {
+  position: relative;
   background: transparent;
   border: none;
   font-size: 1.5rem;
@@ -614,6 +622,23 @@ onMounted(() => {
   cursor: pointer;
   border-radius: 8px;
   transition: background 0.2s;
+}
+
+.mobile-menu-count {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  display: grid;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  place-items: center;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 0.65rem;
+  font-weight: 800;
 }
 
 .mobile-menu-btn:active {
