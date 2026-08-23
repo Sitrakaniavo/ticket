@@ -7,7 +7,7 @@
       </div>
       <div class="footer-links">
         <a href="#">À propos</a>
-        <a href="#">Contact</a>
+        <router-link to="/contact">Contact</router-link>
         <a href="#">Mentions légales</a>
       </div>
       <p class="footer-copy">© 2026 Diatsara Madarail - Tous droits réservés</p>
@@ -63,5 +63,11 @@ footer.app-footer {
   text-align: center;
   color: #7d8e8a;
   font-size: 0.82rem;
+}
+
+@media (max-width: 768px) {
+  footer.app-footer {
+    zoom: 0.7;
+  }
 }
 </style>

@@ -6,6 +6,7 @@ import RegisterPage from '../pages/RegisterPage.vue'
 import ProfilePage from '../pages/ProfilePage.vue'
 import BookingPage from '../pages/BookingPage.vue'
 import TicketPage from '../pages/TicketPage.vue'
+import ContactPage from '../pages/ContactPage.vue'
 
 const routeNames = {
   home: 'Home',
@@ -14,6 +15,7 @@ const routeNames = {
   booking: 'Booking',
   tickets: 'Tickets',
   profile: 'Profile',
+  contact: 'Contact',
   notFound: 'NotFound',
 }
 
@@ -63,6 +65,11 @@ const routes = [
     name: routeNames.tickets,
     component: TicketPage,
     meta: { requiresAuth: true },
+  },
+  {
+    path: '/contact',
+    name: routeNames.contact,
+    component: ContactPage,
   },
   {
     path: '/dashboard',

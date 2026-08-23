@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, reactive, watch, onMounted } from 'vue'
+import { ref, computed, reactive, watch, onMounted, nextTick } from 'vue'
 import QrcodeVue from 'qrcode.vue'
 import { supabaseClient, supabaseMadarail } from '../lib/supabaseClient'
 
@@ -12,9 +12,12 @@ const emit = defineEmits(['remove-item', 'edit-item', 'refresh'])
 
 // ===== ÉTATS =====
 const currentFilter = ref('all')
+const currentPage = ref(1)
+const ticketsPerPage = 6
 const isModalOpen = ref(false)
 const isEditModalOpen = ref(false)
 const selectedTicket = ref(null)
+const editingTicketId = ref(null)
 const isSaving = ref(false)
 const editError = ref('')
 const editSuccess = ref(false)
@@ -256,35 +259,44 @@ async function rechercherPrix() {
 
 // ===== OUVERTURE MODALE D'ÉDITION =====
 async function openEditModal(item) {
-  await loadGares()
-  
-  if (item.id_voyage && !voyagesCache.value[item.id_voyage]) {
-    await getVoyageById(item.id_voyage)
+  if (editingTicketId.value !== null) return
+
+  editingTicketId.value = item.id
+
+  try {
+    await loadGares()
+    
+    if (item.id_voyage && !voyagesCache.value[item.id_voyage]) {
+      await getVoyageById(item.id_voyage)
+    }
+    
+    const voyage = item.id_voyage ? voyagesCache.value[item.id_voyage] : null
+    
+    editForm.id = item.id
+    editForm.nom_voyageur = item.nom_voyageur || ''
+    editForm.cin = item.cin ? String(item.cin).replace(/(\d{3})(\d{3})(\d{3})(\d{3})/, "$1 $2 $3 $4") : ''
+    editForm.mineur = item.mineur || false
+    editForm.classe = item.classe || '2eme'
+    editForm.depart = item.depart || ''
+    editForm.arrivee = item.arrivee || ''
+    editForm.montant = item.montant || 0
+    editForm.num_ticket = item.num_ticket || ''
+    editForm.id_voyage = item.id_voyage || null
+    editForm.date_voyage = item.date_voyage || (voyage ? voyage.date_voyage : '')
+    
+    editError.value = ''
+    editSuccess.value = false
+    prixCalcule.value = null
+    
+    if (editForm.depart && editForm.arrivee) {
+      await rechercherPrix()
+    }
+    
+    isEditModalOpen.value = true
+    await nextTick()
+  } finally {
+    editingTicketId.value = null
   }
-  
-  const voyage = item.id_voyage ? voyagesCache.value[item.id_voyage] : null
-  
-  editForm.id = item.id
-  editForm.nom_voyageur = item.nom_voyageur || ''
-  editForm.cin = item.cin ? String(item.cin).replace(/(\d{3})(\d{3})(\d{3})(\d{3})/, "$1 $2 $3 $4") : ''
-  editForm.mineur = item.mineur || false
-  editForm.classe = item.classe || '2eme'
-  editForm.depart = item.depart || ''
-  editForm.arrivee = item.arrivee || ''
-  editForm.montant = item.montant || 0
-  editForm.num_ticket = item.num_ticket || ''
-  editForm.id_voyage = item.id_voyage || null
-  editForm.date_voyage = item.date_voyage || (voyage ? voyage.date_voyage : '')
-  
-  editError.value = ''
-  editSuccess.value = false
-  prixCalcule.value = null
-  
-  if (editForm.depart && editForm.arrivee) {
-    await rechercherPrix()
-  }
-  
-  isEditModalOpen.value = true
 }
 
 // ===== SURVEILLANCE =====
@@ -435,10 +447,31 @@ const filteredItems = computed(() => {
   return tickets.filter(item => item.status === currentFilter.value)
 })
 
+const totalPages = computed(() => Math.ceil(filteredItems.value.length / ticketsPerPage))
+
+const paginatedItems = computed(() => {
+  const start = (currentPage.value - 1) * ticketsPerPage
+  return filteredItems.value.slice(start, start + ticketsPerPage)
+})
+
+function goToPage(page) {
+  currentPage.value = Math.min(Math.max(page, 1), totalPages.value)
+}
+
 const totalActiveAmount = computed(() => 
   enrichedTickets.value.filter(i => i.status === 'actif')
     .reduce((sum, i) => sum + Number(i.montant || 0), 0)
 )
+
+watch(currentFilter, () => {
+  currentPage.value = 1
+})
+
+watch(filteredItems, () => {
+  if (currentPage.value > totalPages.value) {
+    currentPage.value = Math.max(totalPages.value, 1)
+  }
+})
 
 // ===== CLASSE DISPLAY =====
 const getClasseDisplay = (classe) => {
@@ -505,10 +538,19 @@ onMounted(() => {
       </p>
     </div>
 
+    <!-- Aucun résultat pour le filtre sélectionné -->
+    <div v-else-if="filteredItems.length === 0" class="empty-tickets-state">
+      <div class="empty-tickets-icon">🎫</div>
+      <h3 class="empty-tickets-title">Aucun ticket inactif</h3>
+      <p class="empty-tickets-text">
+        Aucun ticket inactif ne correspond au filtre sélectionné.
+      </p>
+    </div>
+
     <!-- GRILLE DES BILLETS -->
     <template v-else>
       <div class="cart-grid-layout" :class="{ 'mobile-grid': isMobile }">
-        <div v-for="item in filteredItems" :key="item.id" 
+        <div v-for="item in paginatedItems" :key="item.id" 
           class="ticket-card" :class="[`status-${item.status}`]"
           @click="openModal(item)">
           
@@ -565,8 +607,9 @@ onMounted(() => {
           <div class="ticket-footer">
             <span class="price">{{ formatPrice(item.montant) }} MGA</span>
             <div class="actions-zone">
-              <button v-if="item.status === 'actif'" @click.stop="openEditModal(item)" class="card-action-btn edit-btn">
-                Modifier
+              <button v-if="item.status === 'actif'" @click.stop="openEditModal(item)" class="card-action-btn edit-btn" :disabled="editingTicketId !== null">
+                <span v-if="editingTicketId === item.id" class="button-spinner" aria-hidden="true"></span>
+                {{ editingTicketId === item.id ? 'Ouverture...' : 'Modifier' }}
               </button>
               <button v-if="item.status === 'actif'" @click.stop="handleRemove(item.id)" class="card-action-btn remove-btn">
                 Annuler
@@ -575,6 +618,28 @@ onMounted(() => {
           </div>
         </div>
       </div>
+
+      <nav v-if="filteredItems.length > 0" class="pagination" aria-label="Pagination des billets">
+        <button
+          type="button"
+          class="pagination-button"
+          :disabled="currentPage === 1"
+          aria-label="Page précédente"
+          @click="goToPage(currentPage - 1)"
+        >
+          Précédent
+        </button>
+        <span class="pagination-status">Page {{ currentPage }} sur {{ totalPages }}</span>
+        <button
+          type="button"
+          class="pagination-button"
+          :disabled="currentPage === totalPages"
+          aria-label="Page suivante"
+          @click="goToPage(currentPage + 1)"
+        >
+          Suivant
+        </button>
+      </nav>
 
       <!-- Total -->
       <div v-if="hasActiveTickets" class="cart-summary-footer" :class="{ 'mobile-summary': isMobile }">
@@ -858,9 +923,46 @@ onMounted(() => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 16px;
-  max-height: 580px;
-  overflow-y: auto;
   padding: 4px 2px;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 8px 0;
+}
+
+.pagination-button {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid #dce5dd;
+  border-radius: 6px;
+  color: #24746c;
+  background: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pagination-button:hover:not(:disabled) {
+  border-color: #24746c;
+  background: #eaf6f2;
+}
+
+.pagination-button:disabled {
+  color: #98aaa5;
+  background: #f4f8f5;
+  cursor: not-allowed;
+}
+
+.pagination-status {
+  min-width: 100px;
+  color: #52625e;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: center;
 }
 
 .ticket-card {
@@ -1112,6 +1214,29 @@ onMounted(() => {
 
 .card-action-btn:active {
   transform: scale(0.95);
+}
+
+.card-action-btn:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.button-spinner {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 4px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  vertical-align: -1px;
+  animation: button-spin 0.7s linear infinite;
+}
+
+@keyframes button-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .edit-btn {

@@ -110,7 +110,7 @@ const {
         </div>
         <div class="footer-links">
           <a href="#">À propos</a>
-          <a href="#">Contact</a>
+          <router-link to="/contact">Contact</router-link>
           <a href="#">Mentions légales</a>
         </div>
         <p class="footer-copy">
