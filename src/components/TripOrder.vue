@@ -885,6 +885,36 @@ input[type="text"]:focus,
   opacity: 0.7;
 }
 
+.mobile-order .class-option-btn {
+  min-height: 46px;
+  border: 1px solid #cbdad5;
+  background: #f8fbfa;
+  color: #52625e;
+  box-shadow: none;
+}
+
+.mobile-order .class-option-btn.active {
+  position: relative;
+  border-color: #0f766e;
+  background: #0f766e;
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(15, 118, 110, 0.24);
+  transform: translateY(-1px);
+}
+
+.mobile-order .class-option-btn.active::after {
+  position: absolute;
+  top: 5px;
+  right: 7px;
+  content: "✓";
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.mobile-order .class-option-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
 .class-hint {
   display: block;
   margin-top: 4px;
