@@ -14,16 +14,16 @@
         <article class="contact-person">
           <div class="person-icon" aria-hidden="true">1</div>
           <div>
-            <h2>Personnel Diatsara 1</h2>
-            <a href="tel:+261341234567">+261 34 12 345 67</a>
+            <h2>Mr Tanjona</h2>
+            <a href="tel:+261341234567">+261 34 00 503 16</a>
           </div>
         </article>
 
         <article class="contact-person">
           <div class="person-icon" aria-hidden="true">2</div>
           <div>
-            <h2>Personnel Diatsara 2</h2>
-            <a href="tel:+261329876543">+261 32 98 765 43</a>
+            <h2>Mme Ravinala</h2>
+            <a href="tel:+261329876543">+261 34 00 502 11</a>
           </div>
         </article>
       </div>
