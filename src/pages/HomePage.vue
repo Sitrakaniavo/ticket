@@ -57,7 +57,7 @@ const {
           </div>
         </div>
 
-        <div class="hero-right">
+        <!-- <div class="hero-right">
           <div class="hero-stats">
             <div class="stat-card">
               <div class="stat-number">2</div>
@@ -72,7 +72,7 @@ const {
               <div class="stat-label">Gares desservies</div>
             </div>
           </div>
-        </div>
+        </div> -->
       </div>
     </header>
 
