@@ -9,12 +9,24 @@ const router = useRouter();
 
 const cartItems = ref([]);
 const isMobile = ref(false);
+const isMobileMenuOpen = ref(false);
 const showToast = ref(false);
 const toastMessage = ref("");
 const toastTimeoutId = ref(null);
 
 function checkMobile() {
   isMobile.value = window.innerWidth <= 768;
+  if (!isMobile.value) {
+    isMobileMenuOpen.value = false;
+  }
+}
+
+function toggleMobileMenu() {
+  isMobileMenuOpen.value = !isMobileMenuOpen.value;
+}
+
+function closeMobileMenu() {
+  isMobileMenuOpen.value = false;
 }
 
 function triggerToast(message, duration = 3000) {
@@ -138,7 +150,7 @@ onBeforeUnmount(() => {
         </div>
       </router-link>
 
-      <nav class="topbar-actions">
+      <nav v-if="!isMobile" class="topbar-actions">
         <router-link to="/booking" class="nav-pill">Réservation</router-link>
         <router-link to="/tickets" class="nav-pill active position-relative">
           Billets
@@ -154,6 +166,47 @@ onBeforeUnmount(() => {
             <span>{{ user.name }}</span>
             <small>{{ user.email }}</small>
           </div>
+        </router-link>
+      </nav>
+
+      <div v-else class="mobile-nav-actions">
+        <router-link to="/tickets" class="mobile-ticket-link position-relative">
+          Billets
+          <span v-if="cartBadgeCount > 0" class="badge-count-indicator">{{
+            cartBadgeCount
+          }}</span>
+        </router-link>
+        <button
+          type="button"
+          class="mobile-menu-button"
+          :aria-expanded="isMobileMenuOpen"
+          aria-controls="ticket-mobile-menu"
+          :aria-label="isMobileMenuOpen ? 'Fermer le menu' : 'Ouvrir le menu'"
+          @click="toggleMobileMenu"
+        >
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+      </div>
+
+      <nav
+        v-if="isMobile && isMobileMenuOpen"
+        id="ticket-mobile-menu"
+        class="mobile-menu"
+        aria-label="Navigation mobile"
+      >
+        <router-link to="/booking" class="mobile-menu-link" @click="closeMobileMenu">
+          Réservation
+        </router-link>
+        <router-link to="/tickets" class="mobile-menu-link active" @click="closeMobileMenu">
+          Billets
+          <span v-if="cartBadgeCount > 0" class="mobile-badge-count">{{
+            cartBadgeCount
+          }}</span>
+        </router-link>
+        <router-link to="/profile" class="mobile-menu-link" @click="closeMobileMenu">
+          Profil
         </router-link>
       </nav>
     </header>
@@ -243,6 +296,10 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.mobile-nav-actions {
+  display: none;
 }
 
 .nav-pill,
@@ -352,5 +409,133 @@ onBeforeUnmount(() => {
 
 .position-relative {
   position: relative;
+}
+
+@media (max-width: 768px) {
+  .ticket-topbar {
+    min-height: 72px;
+    padding: 12px 16px;
+  }
+
+  .brand-wrap {
+    gap: 8px;
+  }
+
+  .brand-dot {
+    width: 10px;
+    height: 10px;
+  }
+
+  .brand-wrap h1 {
+    font-size: 1rem;
+  }
+
+  .brand-wrap p {
+    font-size: 0.65rem;
+  }
+
+  .mobile-nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .mobile-ticket-link,
+  .mobile-menu-button {
+    min-height: 44px;
+  }
+
+  .mobile-ticket-link {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 11px;
+    border: 1px solid rgba(20, 184, 166, 0.32);
+    border-radius: 999px;
+    color: #0f766e;
+    background: #e8fbf7;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .mobile-menu-button {
+    display: grid;
+    width: 44px;
+    place-content: center;
+    gap: 4px;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    border-radius: 10px;
+    color: #0f172a;
+    background: #f4f8f7;
+  }
+
+  .mobile-menu-button span {
+    display: block;
+    width: 18px;
+    height: 2px;
+    border-radius: 2px;
+    background: currentColor;
+  }
+
+  .mobile-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 16px;
+    left: 16px;
+    display: grid;
+    gap: 4px;
+    padding: 8px;
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: 0 16px 32px rgba(15, 23, 42, 0.14);
+  }
+
+  .mobile-menu-link {
+    display: flex;
+    min-height: 46px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    border-radius: 8px;
+    color: #0f172a;
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .mobile-menu-link.active {
+    color: #0f766e;
+    background: #e8fbf7;
+  }
+
+  .mobile-badge-count {
+    display: grid;
+    min-width: 22px;
+    height: 22px;
+    place-items: center;
+    border-radius: 50%;
+    color: #ffffff;
+    background: #ef4444;
+    font-size: 0.72rem;
+  }
+
+  .ticket-main {
+    padding: 20px 16px;
+  }
+
+  .section-title-block h2 {
+    font-size: 1.5rem;
+  }
+
+  .section-title-block p {
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+
+  .toast-notification {
+    right: 16px;
+    bottom: 16px;
+    left: 16px;
+  }
 }
 </style>

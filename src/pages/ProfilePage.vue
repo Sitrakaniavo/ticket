@@ -1,18 +1,64 @@
 <template>
   <div class="profile-page">
+    <header class="profile-topbar">
+      <router-link to="/" class="brand-wrap">
+        <span class="brand-dot"></span>
+        <div>
+          <h1>Diatsara</h1>
+          <p>Espace Voyageur</p>
+        </div>
+      </router-link>
+
+      <nav v-if="!isMobile" class="topbar-actions">
+        <router-link to="/booking" class="nav-pill">Réservation</router-link>
+        <router-link to="/tickets" class="nav-pill">Billets</router-link>
+        <router-link to="/profile" class="profile-link active">
+          <div class="avatar-placeholder">
+            {{ user.displayName?.charAt(0)?.toUpperCase() || user.full_name?.charAt(0)?.toUpperCase() || "U" }}
+          </div>
+          <div class="profile-meta">
+            <span>{{ user.displayName || user.full_name || "Voyageur" }}</span>
+            <small>{{ user.email || "voyageur@diatsara.mg" }}</small>
+          </div>
+        </router-link>
+      </nav>
+
+      <div v-else class="mobile-nav-actions">
+        <router-link to="/profile" class="mobile-profile-link">Profil</router-link>
+        <button
+          type="button"
+          class="mobile-menu-button"
+          :aria-expanded="isMobileMenuOpen"
+          aria-controls="profile-mobile-menu"
+          :aria-label="isMobileMenuOpen ? 'Fermer le menu' : 'Ouvrir le menu'"
+          @click="toggleMobileMenu"
+        >
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+      </div>
+
+      <nav
+        v-if="isMobile && isMobileMenuOpen"
+        id="profile-mobile-menu"
+        class="mobile-menu"
+        aria-label="Navigation mobile"
+      >
+        <router-link to="/booking" class="mobile-menu-link" @click="closeMobileMenu">
+          Réservation
+        </router-link>
+        <router-link to="/tickets" class="mobile-menu-link" @click="closeMobileMenu">
+          Billets
+        </router-link>
+        <router-link to="/profile" class="mobile-menu-link active" @click="closeMobileMenu">
+          Profil
+        </router-link>
+      </nav>
+    </header>
+
     <!-- En-tête du profil -->
     <header class="profile-header">
-      <button class="btn-back" @click="goBack">
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-        >
-          <polyline points="15 18 9 12 15 6" />
-        </svg>
-        Retour
-      </button>
       <div class="profile-header-content">
         <div class="profile-avatar-wrapper">
           <div class="profile-avatar">
@@ -289,7 +335,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch } from "vue";
+import { ref, reactive, onMounted, onBeforeUnmount, watch } from "vue";
 import { useRouter } from "vue-router";
 import { supabaseClient } from "../lib/supabaseClient";
 
@@ -331,6 +377,23 @@ const confirmPassword = ref("");
 const passwordError = ref("");
 const passwordSuccess = ref("");
 const isLoadingPassword = ref(false);
+const isMobile = ref(false);
+const isMobileMenuOpen = ref(false);
+
+function checkMobile() {
+  isMobile.value = window.innerWidth <= 768;
+  if (!isMobile.value) {
+    isMobileMenuOpen.value = false;
+  }
+}
+
+function toggleMobileMenu() {
+  isMobileMenuOpen.value = !isMobileMenuOpen.value;
+}
+
+function closeMobileMenu() {
+  isMobileMenuOpen.value = false;
+}
 
 // ===== CHARGEMENT DES DONNÉES UTILISATEUR =====
 function loadUserData() {
@@ -575,6 +638,12 @@ const logout = () => {
 // ===== INITIALISATION =====
 onMounted(() => {
   loadUserData();
+  checkMobile();
+  window.addEventListener("resize", checkMobile);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", checkMobile);
 });
 </script>
 
@@ -590,6 +659,111 @@ onMounted(() => {
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
+}
+
+.profile-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 24px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+  backdrop-filter: blur(12px);
+}
+
+.brand-wrap {
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.brand-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #22c55e;
+}
+
+.brand-wrap h1,
+.brand-wrap p {
+  margin: 0;
+}
+
+.brand-wrap h1 {
+  color: #0f172a;
+  font-size: 1.25rem;
+}
+
+.brand-wrap p {
+  color: #0f172a;
+  font-size: 0.78rem;
+  opacity: 0.8;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nav-pill,
+.profile-link {
+  color: #0f172a;
+  text-decoration: none;
+}
+
+.nav-pill {
+  padding: 10px 14px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 999px;
+  background: #f4f8f7;
+  font-weight: 700;
+}
+
+.profile-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border: 1px solid rgba(20, 184, 166, 0.32);
+  border-radius: 999px;
+  background: #e8fbf7;
+}
+
+.avatar-placeholder {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 50%;
+  background: #d1fae5;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.profile-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.profile-meta span {
+  font-weight: 700;
+}
+
+.profile-meta small {
+  opacity: 0.75;
+}
+
+.mobile-nav-actions {
+  display: none;
 }
 
 /* ===== EN-TÊTE ===== */
@@ -1218,6 +1392,101 @@ onMounted(() => {
 
 /* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
+  .profile-topbar {
+    min-height: 72px;
+    padding: 12px 16px;
+  }
+
+  .brand-wrap {
+    gap: 8px;
+  }
+
+  .brand-dot {
+    width: 10px;
+    height: 10px;
+  }
+
+  .brand-wrap h1 {
+    font-size: 1rem;
+  }
+
+  .brand-wrap p {
+    font-size: 0.65rem;
+  }
+
+  .mobile-nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .mobile-profile-link,
+  .mobile-menu-button {
+    min-height: 44px;
+  }
+
+  .mobile-profile-link {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 11px;
+    border: 1px solid rgba(20, 184, 166, 0.32);
+    border-radius: 999px;
+    color: #0f766e;
+    background: #e8fbf7;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .mobile-menu-button {
+    display: grid;
+    width: 44px;
+    place-content: center;
+    gap: 4px;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    border-radius: 10px;
+    color: #0f172a;
+    background: #f4f8f7;
+  }
+
+  .mobile-menu-button span {
+    display: block;
+    width: 18px;
+    height: 2px;
+    border-radius: 2px;
+    background: currentColor;
+  }
+
+  .mobile-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 16px;
+    left: 16px;
+    display: grid;
+    gap: 4px;
+    padding: 8px;
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: 0 16px 32px rgba(15, 23, 42, 0.14);
+  }
+
+  .mobile-menu-link {
+    display: flex;
+    min-height: 46px;
+    align-items: center;
+    padding: 0 12px;
+    border-radius: 8px;
+    color: #0f172a;
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .mobile-menu-link.active {
+    color: #0f766e;
+    background: #e8fbf7;
+  }
+
   .profile-header {
     padding: 20px 16px;
   }

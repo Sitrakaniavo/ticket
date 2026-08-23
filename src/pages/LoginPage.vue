@@ -1,8 +1,10 @@
 <script setup>
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLoginPage } from '../composables/useLoginPage'
 
 const router = useRouter()
+const showPassword = ref(false)
 
 const {
   email,
@@ -52,13 +54,24 @@ const {
 
       <label>
         Mot de passe
-        <input
-          v-model="password"
-          type="password"
-          placeholder="Votre mot de passe"
-          autocomplete="current-password"
-          required
-        />
+        <span class="password-field">
+          <input
+            v-model="password"
+            :type="showPassword ? 'text' : 'password'"
+            placeholder="Votre mot de passe"
+            autocomplete="current-password"
+            required
+          />
+          <button
+            class="password-toggle"
+            type="button"
+            :aria-label="showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'"
+            :title="showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'"
+            @click="showPassword = !showPassword"
+          >
+            <span class="eye-icon" :class="{ hidden: showPassword }"></span>
+          </button>
+        </span>
       </label>
 
       <p v-if="errorMessage" class="form-error">{{ errorMessage }}</p>

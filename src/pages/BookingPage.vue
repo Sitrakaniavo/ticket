@@ -16,10 +16,22 @@ const showToast = ref(false)
 const toastMessage = ref('')
 const editingTicket = ref(null)
 const isMobile = ref(false)
+const isMobileMenuOpen = ref(false)
 const toastTimeoutId = ref(null)
 
 function checkMobile() {
   isMobile.value = window.innerWidth <= 768
+  if (!isMobile.value) {
+    isMobileMenuOpen.value = false
+  }
+}
+
+function toggleMobileMenu() {
+  isMobileMenuOpen.value = !isMobileMenuOpen.value
+}
+
+function closeMobileMenu() {
+  isMobileMenuOpen.value = false
 }
 
 function triggerToast(message, duration = 3000) {
@@ -175,7 +187,7 @@ onBeforeUnmount(() => {
         </div>
       </router-link>
 
-      <nav class="topbar-actions">
+      <nav v-if="!isMobile" class="topbar-actions">
         <router-link to="/booking" class="nav-pill active">Réservation</router-link>
         <router-link to="/tickets" class="nav-pill position-relative">
           Billets
@@ -189,6 +201,40 @@ onBeforeUnmount(() => {
           </div>
         </router-link>
       </nav>
+
+        <div v-else class="mobile-nav-actions">
+          <router-link to="/booking" class="mobile-booking-link">Réservation</router-link>
+          <button
+            type="button"
+            class="mobile-menu-button"
+            :aria-expanded="isMobileMenuOpen"
+            aria-controls="booking-mobile-menu"
+            :aria-label="isMobileMenuOpen ? 'Fermer le menu' : 'Ouvrir le menu'"
+            @click="toggleMobileMenu"
+          >
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+        </div>
+
+        <nav
+          v-if="isMobile && isMobileMenuOpen"
+          id="booking-mobile-menu"
+          class="mobile-menu"
+          aria-label="Navigation mobile"
+        >
+          <router-link to="/booking" class="mobile-menu-link active" @click="closeMobileMenu">
+            Réservation
+          </router-link>
+          <router-link to="/tickets" class="mobile-menu-link" @click="closeMobileMenu">
+            Billets
+            <span v-if="cartBadgeCount > 0" class="mobile-badge-count">{{ cartBadgeCount }}</span>
+          </router-link>
+          <router-link to="/profile" class="mobile-menu-link" @click="closeMobileMenu">
+            Profil
+          </router-link>
+        </nav>
     </header>
 
     <Transition name="toast-fade">
@@ -295,6 +341,10 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
 }
 
+.mobile-nav-actions {
+  display: none;
+}
+
 .nav-pill,
 .profile-link {
   text-decoration: none;
@@ -391,6 +441,131 @@ onBeforeUnmount(() => {
 
 .position-relative {
   position: relative;
+}
+
+@media (max-width: 768px) {
+  .booking-topbar {
+    min-height: 72px;
+    padding: 12px 16px;
+  }
+
+  .brand-wrap {
+    gap: 8px;
+  }
+
+  .brand-dot {
+    width: 10px;
+    height: 10px;
+  }
+
+  .brand-wrap h1 {
+    font-size: 1rem;
+  }
+
+  .brand-wrap p {
+    font-size: 0.65rem;
+  }
+
+  .mobile-nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .mobile-booking-link,
+  .mobile-menu-button {
+    min-height: 44px;
+  }
+
+  .mobile-booking-link {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 11px;
+    border: 1px solid rgba(20, 184, 166, 0.32);
+    border-radius: 999px;
+    color: #0f766e;
+    background: #e8fbf7;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .mobile-menu-button {
+    display: grid;
+    width: 44px;
+    place-content: center;
+    gap: 4px;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    border-radius: 10px;
+    color: #0f172a;
+    background: #f4f8f7;
+  }
+
+  .mobile-menu-button span {
+    display: block;
+    width: 18px;
+    height: 2px;
+    border-radius: 2px;
+    background: currentColor;
+  }
+
+  .mobile-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 16px;
+    left: 16px;
+    display: grid;
+    gap: 4px;
+    padding: 8px;
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: 0 16px 32px rgba(15, 23, 42, 0.14);
+  }
+
+  .mobile-menu-link {
+    display: flex;
+    min-height: 46px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    border-radius: 8px;
+    color: #0f172a;
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .mobile-menu-link.active {
+    color: #0f766e;
+    background: #e8fbf7;
+  }
+
+  .mobile-badge-count {
+    display: grid;
+    min-width: 22px;
+    height: 22px;
+    place-items: center;
+    border-radius: 50%;
+    color: #ffffff;
+    background: #ef4444;
+    font-size: 0.72rem;
+  }
+
+  .booking-main {
+    padding: 20px 16px 32px;
+  }
+
+  .empty-state,
+  .loading-state,
+  .error-state {
+    padding: 22px 16px;
+  }
+
+  .toast-notification {
+    right: 16px;
+    bottom: 16px;
+    left: 16px;
+  }
 }
 
 .empty-state,
